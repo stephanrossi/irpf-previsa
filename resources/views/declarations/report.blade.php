@@ -21,7 +21,7 @@
             <div>
                 <div class="text-sm text-slate-600">Cliente</div>
                 <h1 class="text-2xl font-semibold text-slate-900">{{ $declaration->client->nome }}</h1>
-                <div class="text-sm text-slate-600">CPF: {{ $declaration->client->masked_cpf }}</div>
+                <div class="text-sm text-slate-600">CPF: {{ $declaration->client->formatted_cpf }}</div>
                 <div class="text-sm text-slate-600">Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}</div>
             </div>
             <div class="flex items-center gap-3">

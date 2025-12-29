@@ -21,7 +21,7 @@
             <div>
                 <div class="text-sm text-slate-600">Cliente</div>
                 <h1 class="text-2xl font-semibold text-slate-900">{{ $client->nome }}</h1>
-                <div class="text-sm text-slate-600">CPF: {{ $client->masked_cpf }}</div>
+                <div class="text-sm text-slate-600">CPF: {{ $client->formatted_cpf }}</div>
             </div>
             <div class="flex items-center gap-3">
                 <a href="{{ route('clients.index') }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>

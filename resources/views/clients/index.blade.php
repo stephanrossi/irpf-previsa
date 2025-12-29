@@ -51,7 +51,7 @@
                             <div>
                                 <div class="font-semibold text-slate-900">{{ $client->nome }}</div>
                             </div>
-                            <div class="text-slate-700">{{ $client->masked_cpf }}</div>
+                            <div class="text-slate-700">{{ $client->formatted_cpf }}</div>
                             <div>
                                 @if ($client->risk_declarations_count > 0)
                                     <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">

@@ -43,6 +43,5 @@ php artisan test
 ```
 
 ## Privacidade
-- CPF mascarado na UI (`***.***.***-xx`).
 - Arquivos .DEC armazenados apenas em `storage/app/declarations`.
 - Conteúdo do arquivo não é logado; só metadados/totais são persistidos.

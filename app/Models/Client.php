@@ -19,11 +19,11 @@ class Client extends Model
         return $this->hasMany(Declaration::class)->orderByDesc('ano_base');
     }
 
-    public function getMaskedCpfAttribute(): string
+    public function getFormattedCpfAttribute(): string
     {
         $digits = str_pad(preg_replace('/\D/', '', $this->cpf), 11, '0', STR_PAD_LEFT);
 
-        return sprintf('***.***.***-%s', substr($digits, -2));
+        return substr($digits, 0, 3).'.'.substr($digits, 3, 3).'.'.substr($digits, 6, 3).'-'.substr($digits, 9, 2);
     }
 
     public function getHasRiskAttribute(): bool
