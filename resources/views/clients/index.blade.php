@@ -7,7 +7,7 @@
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
                 <h1 class="text-2xl font-semibold text-slate-900">Clientes</h1>
-                <p class="text-sm text-slate-600">Visualize clientes e anos já importados.</p>
+                <p class="text-sm text-slate-600">Visualize clientes e detalhes de declarações.</p>
             </div>
             <a href="{{ route('import.create') }}"
                class="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
@@ -57,14 +57,14 @@
                 </a>
                 <a href="{{ route('clients.index', array_merge(request()->all(), ['sort' => 'anos', 'direction' => $sort === 'anos' && $direction === 'asc' ? 'desc' : 'asc'])) }}"
                    class="flex items-center gap-1 cursor-pointer">
-                    Anos importados <span class="text-slate-400">{{ $sort === 'anos' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                    NÚM. DECLARAÇÕES <span class="text-slate-400">{{ $sort === 'anos' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </a>
                 <span></span>
             </div>
 
             @forelse ($clients as $client)
                 <div class="border-t border-slate-100 first:border-t-0">
-                    <a href="{{ route('clients.show', array_merge(['client' => $client], request()->query())) }}" class="block transition hover:bg-slate-50/70">
+                    <a href="{{ route('clients.show', array_merge(['client' => $client], request()->query())) }}" class="block transition hover:bg-slate-100/70">
                         <div class="grid grid-cols-1 gap-2 px-4 py-4 text-sm text-slate-800 md:grid-cols-[2fr_1fr_1fr_1fr_80px] md:items-center">
                             <div>
                                 <div class="font-semibold text-slate-900">{{ $client->nome }}</div>

@@ -22,10 +22,6 @@
                 </a>
                 <div class="flex items-center gap-3">
                     <a href="{{ route('clients.index') }}" class="text-sm text-slate-600 hover:text-slate-900">Dashboard</a>
-                    <a href="{{ route('import.create') }}"
-                       class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
-                        Novo
-                    </a>
                 </div>
             </div>
         </header>
