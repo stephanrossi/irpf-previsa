@@ -50,6 +50,8 @@ class ParseDecFileService
                     'cpf' => $this->onlyDigits($this->slice($line, 22, 32)),
                     'nome' => trim($this->slice($line, 40, 99)),
                     'in_completa' => strtoupper(trim($this->slice($line, 121, 121))) === 'S',
+                    'is_retificadora' => trim($this->slice($line, 21, 21)) === '1',
+                    'recibo_anterior' => trim($this->slice($line, 124, 133)) ?: null,
                 ];
 
                 continue;
@@ -139,7 +141,40 @@ class ParseDecFileService
             totalIrPago: $expenseTotals['total_ir_pago'],
             gastosDeclaradosTotal: $expenseTotals['gastos_declarados_total'],
             gastosDeclaradosBreakdown: $expenseTotals['gastos_declarados_breakdown'],
+            isRetificadora: $header['is_retificadora'],
+            reciboAnterior: $header['recibo_anterior'],
         );
+    }
+
+    public function parseHeader(string $path): array
+    {
+        if (! is_readable($path)) {
+            throw new InvalidArgumentException('DEC file path is not readable.');
+        }
+        $file = new SplFileObject($path, 'r');
+        foreach ($file as $line) {
+            if ($line === false || $line === null) {
+                continue;
+            }
+            $line = rtrim((string) $line, "\r\n");
+            if ($line === '') {
+                continue;
+            }
+            $line = str_pad($line, 1200);
+            $prefix = substr($line, 0, 2);
+            if ($prefix === 'IR') {
+                return [
+                    'cpf' => $this->onlyDigits($this->slice($line, 22, 32)),
+                    'nome' => trim($this->slice($line, 40, 99)),
+                    'ano_base' => (int) $this->slice($line, 13, 16),
+                    'exercicio' => (int) $this->slice($line, 9, 12),
+                    'is_retificadora' => trim($this->slice($line, 21, 21)) === '1',
+                    'recibo_anterior' => trim($this->slice($line, 124, 133)) ?: null,
+                ];
+            }
+        }
+
+        throw new RuntimeException('DEC header not found or invalid.');
     }
 
     private function slice(string $line, int $start, int $end): string

@@ -17,19 +17,27 @@
     @endphp
 
     <div class="space-y-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <div class="text-sm text-slate-600">Cliente</div>
-                <h1 class="text-2xl font-semibold text-slate-900">{{ $declaration->client->nome }}</h1>
-                <div class="text-sm text-slate-600">CPF: {{ $declaration->client->formatted_cpf }}</div>
-                <div class="text-sm text-slate-600">Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}</div>
-            </div>
-            <div class="flex items-center gap-3">
-                @if ($risco)
-                    <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                        EM RISCO — Variação a descoberto: {{ $fmt($variacao) }}
-                    </span>
-                @else
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="text-sm text-slate-600">Cliente</div>
+                    <h1 class="text-2xl font-semibold text-slate-900">{{ $declaration->client->nome }}</h1>
+                    <div class="text-sm text-slate-600">CPF: {{ $declaration->client->formatted_cpf }}</div>
+                    <div class="text-sm text-slate-600">Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}</div>
+                </div>
+                <div class="flex items-center gap-3">
+                    @if ($declaration->last_is_retificadora)
+                        <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
+                            Retificadora
+                            @if ($declaration->last_recibo_anterior)
+                                <span class="text-indigo-600">Recibo anterior: {{ $declaration->last_recibo_anterior }}</span>
+                            @endif
+                        </span>
+                    @endif
+                    @if ($risco)
+                        <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+                            EM RISCO — Variação a descoberto: {{ $fmt($variacao) }}
+                        </span>
+                    @else
                     <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
                         OK — Sem indício pela regra
                     </span>

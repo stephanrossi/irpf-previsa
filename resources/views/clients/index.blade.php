@@ -21,13 +21,19 @@
                 <input type="text" name="q" value="{{ $search }}"
                        class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                        placeholder="Digite o nome ou CPF">
-                <div class="flex items-center gap-2 text-sm text-slate-700">
-                    <input type="checkbox" name="risk_only" value="1" {{ $riskOnly ? 'checked' : '' }} class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300">
-                    <span>Somente em risco</span>
+                <div class="flex flex-wrap gap-4 text-sm text-slate-700">
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="risk_only" value="1" {{ $riskOnly ? 'checked' : '' }} class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300 cursor-pointer">
+                        <span>Somente em risco</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" name="retificadora_only" value="1" {{ $retificadoraOnly ? 'checked' : '' }} class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300 cursor-pointer">
+                        <span>Somente retificadoras</span>
+                    </label>
                 </div>
                 <div class="flex gap-2">
                     <button type="submit"
-                            class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
+                            class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 cursor-pointer">
                         Buscar
                     </button>
                     <a href="{{ route('clients.index') }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Limpar</a>
@@ -37,16 +43,28 @@
 
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white/80 shadow-sm">
             <div class="hidden bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-600 md:grid md:grid-cols-[2fr_1fr_1fr_1fr_80px]">
-                <span>Cliente</span>
-                <span>CPF</span>
-                <span>Status</span>
-                <span>Anos importados</span>
+                <a href="{{ route('clients.index', array_merge(request()->all(), ['sort' => 'nome', 'direction' => $sort === 'nome' && $direction === 'asc' ? 'desc' : 'asc'])) }}"
+                   class="flex items-center gap-1 cursor-pointer">
+                    Cliente <span class="text-slate-400">{{ $sort === 'nome' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </a>
+                <a href="{{ route('clients.index', array_merge(request()->all(), ['sort' => 'cpf', 'direction' => $sort === 'cpf' && $direction === 'asc' ? 'desc' : 'asc'])) }}"
+                   class="flex items-center gap-1 cursor-pointer">
+                    CPF <span class="text-slate-400">{{ $sort === 'cpf' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </a>
+                <a href="{{ route('clients.index', array_merge(request()->all(), ['sort' => 'status', 'direction' => $sort === 'status' && $direction === 'asc' ? 'desc' : 'asc'])) }}"
+                   class="flex items-center gap-1 cursor-pointer">
+                    Status <span class="text-slate-400">{{ $sort === 'status' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </a>
+                <a href="{{ route('clients.index', array_merge(request()->all(), ['sort' => 'anos', 'direction' => $sort === 'anos' && $direction === 'asc' ? 'desc' : 'asc'])) }}"
+                   class="flex items-center gap-1 cursor-pointer">
+                    Anos importados <span class="text-slate-400">{{ $sort === 'anos' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
+                </a>
                 <span></span>
             </div>
 
             @forelse ($clients as $client)
                 <div class="border-t border-slate-100 first:border-t-0">
-                    <a href="{{ route('clients.show', $client) }}" class="block transition hover:bg-slate-50/70">
+                    <a href="{{ route('clients.show', array_merge(['client' => $client], request()->query())) }}" class="block transition hover:bg-slate-50/70">
                         <div class="grid grid-cols-1 gap-2 px-4 py-4 text-sm text-slate-800 md:grid-cols-[2fr_1fr_1fr_1fr_80px] md:items-center">
                             <div>
                                 <div class="font-semibold text-slate-900">{{ $client->nome }}</div>

@@ -6,8 +6,10 @@ use App\DataTransferObjects\ParsedDeclarationData;
 use App\Models\Client;
 use App\Models\Declaration;
 use App\Models\DeclarationIsento;
+use App\Models\DeclarationImport;
 use App\Services\IrpfInconsistencyService;
 use App\Services\ParseDecFileService;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -24,13 +26,36 @@ class ImportDecFileAction
 
     public function execute(UploadedFile $uploadedFile): Declaration
     {
+        $sha = hash_file('sha256', $uploadedFile->getRealPath());
+        $header = $this->parser->parseHeader($uploadedFile->getRealPath());
         $parsed = $this->parser->parse($uploadedFile->getRealPath());
 
-        return DB::transaction(function () use ($parsed, $uploadedFile) {
+        return DB::transaction(function () use ($parsed, $uploadedFile, $sha, $header) {
             $client = Client::updateOrCreate(
-                ['cpf' => $parsed->cpf],
-                ['nome' => $parsed->nome],
+                ['cpf' => $header['cpf']],
+                ['nome' => $header['nome']],
             );
+
+            $existingDeclaration = Declaration::where('client_id', $client->id)
+                ->where('ano_base', $header['ano_base'])
+                ->first();
+
+            if ($existingDeclaration) {
+                $duplicate = DeclarationImport::where('declaration_id', $existingDeclaration->id)
+                    ->where('source_sha256', $sha)
+                    ->exists();
+                if ($duplicate) {
+                    throw ValidationException::withMessages([
+                        'files' => ['Este mesmo arquivo já foi importado anteriormente.'],
+                    ]);
+                }
+
+                if (! $header['is_retificadora']) {
+                    throw ValidationException::withMessages([
+                        'files' => ["Já existe declaração importada para o ano-base {$header['ano_base']}. Para atualizar, importe uma declaração retificadora."],
+                    ]);
+                }
+            }
 
             $storedPath = $this->storeFile($uploadedFile, $client, $parsed);
 
@@ -53,6 +78,10 @@ class ImportDecFileAction
                     'total_dividas_onus' => $parsed->totalDividasOnus,
                     'total_bens_adquiridos_ano' => $parsed->totalBensAdquiridosAno,
                     'source_file_path' => $storedPath,
+                    'last_is_retificadora' => $parsed->isRetificadora,
+                    'last_recibo_anterior' => $parsed->reciboAnterior,
+                    'last_source_sha256' => $sha,
+                    'last_imported_at' => now(),
                     'imported_at' => now(),
                 ]
             );
@@ -60,6 +89,15 @@ class ImportDecFileAction
             $this->syncIsentos($declaration, $parsed->isentosDetalhados);
             $topIsentos = collect($parsed->isentosDetalhados)->sortByDesc('valor')->take(5)->values()->all();
             $this->inconsistencyService->applyToDeclaration($declaration, $declaration->gastos_estimados, $topIsentos);
+
+            DeclarationImport::create([
+                'declaration_id' => $declaration->id,
+                'is_retificadora' => $parsed->isRetificadora,
+                'recibo_anterior' => $parsed->reciboAnterior,
+                'source_file_path' => $storedPath,
+                'source_sha256' => $sha,
+                'imported_at' => now(),
+            ]);
 
             return $declaration;
         });

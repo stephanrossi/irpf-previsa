@@ -32,6 +32,10 @@ class Declaration extends Model
         'risco_variacao_patrimonial',
         'inconsistencia_payload',
         'source_file_path',
+        'last_is_retificadora',
+        'last_recibo_anterior',
+        'last_source_sha256',
+        'last_imported_at',
         'imported_at',
     ];
 
@@ -56,6 +60,8 @@ class Declaration extends Model
         'variacao_patrimonial_descoberto' => 'decimal:2',
         'risco_variacao_patrimonial' => 'boolean',
         'inconsistencia_payload' => 'array',
+        'last_is_retificadora' => 'boolean',
+        'last_imported_at' => 'datetime',
     ];
 
     public function client()
@@ -66,5 +72,10 @@ class Declaration extends Model
     public function isentos()
     {
         return $this->hasMany(DeclarationIsento::class);
+    }
+
+    public function imports()
+    {
+        return $this->hasMany(DeclarationImport::class)->orderByDesc('imported_at');
     }
 }

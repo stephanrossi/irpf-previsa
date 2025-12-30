@@ -12,6 +12,17 @@ class ClientController extends Controller
         $search = trim((string) $request->string('q'));
         $searchDigits = preg_replace('/\D/', '', $search);
         $riskOnly = $request->boolean('risk_only');
+        $retificadoraOnly = $request->boolean('retificadora_only');
+        $sort = $request->string('sort', 'nome')->toString();
+        $direction = strtolower($request->string('direction', 'asc')->toString()) === 'desc' ? 'desc' : 'asc';
+
+        $allowedSorts = [
+            'nome' => 'nome',
+            'cpf' => 'cpf',
+            'anos' => 'declarations_count',
+            'status' => 'risk_declarations_count',
+        ];
+        $orderColumn = $allowedSorts[$sort] ?? 'nome';
 
         $clients = Client::withCount([
                 'declarations',
@@ -29,7 +40,10 @@ class ClientController extends Controller
             ->when($riskOnly, function ($query) {
                 $query->whereHas('declarations', fn ($q) => $q->where('risco_variacao_patrimonial', true));
             })
-            ->orderBy('nome')
+            ->when($retificadoraOnly, function ($query) {
+                $query->whereHas('declarations', fn ($q) => $q->where('last_is_retificadora', true));
+            })
+            ->orderBy($orderColumn, $direction)
             ->paginate(12)
             ->withQueryString();
 
@@ -37,6 +51,9 @@ class ClientController extends Controller
             'clients' => $clients,
             'search' => $search,
             'riskOnly' => $riskOnly,
+            'retificadoraOnly' => $retificadoraOnly,
+            'sort' => $sort,
+            'direction' => $direction,
         ]);
     }
 

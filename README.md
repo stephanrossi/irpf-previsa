@@ -3,9 +3,10 @@
 Aplicação Laravel 12 (PHP 8.3) para importar declarações IRPF (.DEC), organizar por cliente/ano e entregar um painel enxuto com totais, gastos declarados e alertas de risco patrimonial. Interface minimalista com Tailwind + Alpine e gráficos Chart.js.
 
 ## Visão geral
-- **Importação .DEC** (storage privado) com parser streaming (SplFileObject).
+- **Importação .DEC** (storage privado) com parser streaming (SplFileObject), suporta múltiplos arquivos por vez.
 - **Dados-chave por ano**: renda tributável, renda isenta, bens imóveis, dívidas, bens adquiridos no ano.
 - **Gastos declarados**: planos de saúde, médicas/odonto, instrução, pensão judicial, PGBL e IR pago (registros 26 e 20), com memória de cálculo detalhada.
+- **Retificadoras**: importa retificadora para o mesmo ano-base e bloqueia originais duplicadas; histórico de imports com recibo anterior e hash do arquivo.
 - **Risco patrimonial**: regra simples — bens adquiridos > (renda tributável + renda isenta - (gastos estimados + declarados)) sinaliza “EM RISCO”. Badge em cliente/ano e relatório dedicado.
 - **UI limpa**: dashboard com busca + filtro “somente em risco”, abas por ano do cliente, cards de totais, input de gastos estimados com salvamento via AJAX, gráficos de evolução e pizza para gastos declarados, relatório explicativo por ano.
 

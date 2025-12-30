@@ -16,15 +16,19 @@
         ];
     @endphp
 
-    <div class="space-y-6">
+    <div class="space-y-6" x-data="{ tab: null }">
         <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
                 <div class="text-sm text-slate-600">Cliente</div>
-                <h1 class="text-2xl font-semibold text-slate-900">{{ $client->nome }}</h1>
-                <div class="text-sm text-slate-600">CPF: {{ $client->formatted_cpf }}</div>
+                <h1 class="text-2xl font-semibold text-slate-900">
+                    <button type="button" @click="tab = null" class="underline-offset-4 hover:underline cursor-pointer">{{ $client->nome }}</button>
+                </h1>
+                <div class="text-sm text-slate-600">
+                    CPF: <button type="button" @click="tab = null" class="underline-offset-4 hover:underline cursor-pointer">{{ $client->formatted_cpf }}</button>
+                </div>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('clients.index') }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>
+                <a href="{{ route('clients.index', request()->query()) }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>
                 <a href="{{ route('import.create') }}"
                    class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
                     Importar novo .DEC
@@ -38,14 +42,16 @@
             </div>
         @else
             <div class="space-y-6">
-                <div x-data="{ tab: null }" class="space-y-4">
+                <div class="space-y-4">
                     <div class="flex flex-wrap gap-2">
                         @foreach ($declarations as $declaration)
                             <button
                                 type="button"
                                 @click="tab = '{{ $declaration->ano_base }}'"
-                                :class="tab === '{{ $declaration->ano_base }}' ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-800 border border-slate-200'"
-                                class="rounded-full px-4 py-2 text-sm font-medium transition">
+                                :class="tab === '{{ $declaration->ano_base }}'
+                                    ? 'bg-slate-900 text-white shadow-sm hover:bg-slate-100 hover:text-slate-900 hover:border-slate-300'
+                                    : 'bg-white text-slate-800 border border-slate-200 hover:bg-slate-100 hover:border-slate-300'"
+                                class="rounded-full px-4 py-2 text-sm font-medium transition cursor-pointer">
                                 Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}
                             </button>
                         @endforeach
@@ -72,6 +78,14 @@
                                 @else
                                     <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                                         OK
+                                    </span>
+                                @endif
+                                @if ($declaration->last_is_retificadora)
+                                    <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                        Retificadora
+                                        @if ($declaration->last_recibo_anterior)
+                                            <span class="text-indigo-600">Recibo anterior: {{ $declaration->last_recibo_anterior }}</span>
+                                        @endif
                                     </span>
                                 @endif
                                 <a href="{{ route('declarations.report', $declaration) }}" class="text-xs font-medium text-slate-800 underline underline-offset-2">

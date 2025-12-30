@@ -43,6 +43,8 @@ class ParseDecFileServiceTest extends TestCase
         $this->assertSame(2024, $data->exercicio);
         $this->assertSame(2023, $data->anoBase);
         $this->assertSame('completa', $data->tipo);
+        $this->assertFalse($data->isRetificadora);
+        $this->assertNull($data->reciboAnterior);
     }
 
     public function test_parses_money_with_leading_zeros(): void
@@ -142,7 +144,7 @@ class ParseDecFileServiceTest extends TestCase
     public function test_parses_reg_23_isentos_detail(): void
     {
         $lines = [
-            $this->headerLine(),
+            $this->headerLine(retificadora: true, recibo: '1234567890'),
             $this->buildLine('20', [
                 [66, 78, str_pad('10000', 13, '0', STR_PAD_LEFT)],
                 [470, 482, str_pad('30000', 13, '0', STR_PAD_LEFT)],
@@ -162,6 +164,8 @@ class ParseDecFileServiceTest extends TestCase
         $this->assertEqualsWithDelta(300.00, $data->totalRendaIsenta, 0.001);
         $this->assertCount(2, $data->isentosDetalhados);
         $this->assertSame([['codigo' => 1501, 'valor' => 50.0], ['codigo' => 1502, 'valor' => 20.0]], $data->isentosDetalhados);
+        $this->assertTrue($data->isRetificadora);
+        $this->assertSame('1234567890', $data->reciboAnterior);
     }
 
     private function headerLine(
@@ -169,7 +173,9 @@ class ParseDecFileServiceTest extends TestCase
         int $anoBase = 2023,
         string $cpf = '12345678901',
         string $nome = 'Maria Teste',
-        bool $completa = true
+        bool $completa = true,
+        bool $retificadora = false,
+        string $recibo = ''
     ): string {
         return $this->buildLine('IRPF', [
             [9, 12, (string) $exercicio],
@@ -177,6 +183,8 @@ class ParseDecFileServiceTest extends TestCase
             [22, 32, $cpf],
             [40, 99, $nome],
             [121, 121, $completa ? 'S' : 'N'],
+            [21, 21, $retificadora ? '1' : '0'],
+            [124, 133, $recibo],
         ]);
     }
 
