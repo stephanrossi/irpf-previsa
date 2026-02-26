@@ -45,6 +45,36 @@ class ClientComplexityFilterTest extends TestCase
         $baixa->assertSee('Cliente C');
     }
 
+    public function test_filters_clients_by_any_declaration_ano_base(): void
+    {
+        $clienteA = Client::create(['nome' => 'Cliente A', 'cpf' => '11111111111']);
+        $clienteB = Client::create(['nome' => 'Cliente B', 'cpf' => '22222222222']);
+        $clienteC = Client::create(['nome' => 'Cliente C', 'cpf' => '33333333333']);
+
+        $this->createDeclaration($clienteA->id, 2024, 'alta');
+        $this->createDeclaration($clienteA->id, 2023, 'media');
+        $this->createDeclaration($clienteB->id, 2023, 'baixa');
+        $this->createDeclaration($clienteC->id, 2022, 'baixa');
+
+        $ano2024 = $this->get(route('clients.index', ['ano_base' => 2024]));
+        $ano2024->assertOk();
+        $ano2024->assertSee('Cliente A');
+        $ano2024->assertDontSee('Cliente B');
+        $ano2024->assertDontSee('Cliente C');
+
+        $ano2023 = $this->get(route('clients.index', ['ano_base' => 2023]));
+        $ano2023->assertOk();
+        $ano2023->assertSee('Cliente A');
+        $ano2023->assertSee('Cliente B');
+        $ano2023->assertDontSee('Cliente C');
+
+        $ano2022 = $this->get(route('clients.index', ['ano_base' => 2022]));
+        $ano2022->assertOk();
+        $ano2022->assertDontSee('Cliente A');
+        $ano2022->assertDontSee('Cliente B');
+        $ano2022->assertSee('Cliente C');
+    }
+
     private function createDeclaration(int $clientId, int $anoBase, string $complexity): void
     {
         Declaration::create([

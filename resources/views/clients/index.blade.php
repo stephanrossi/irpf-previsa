@@ -24,15 +24,27 @@
                         <input type="text" name="q" value="{{ $search }}"
                                class="w-full md:flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                                placeholder="Digite o nome ou CPF">
-                        <div class="flex items-center gap-2 md:w-[260px]">
-                            <label for="complexity" class="text-sm font-medium text-slate-700 whitespace-nowrap">Complexidade:</label>
-                            <select id="complexity" name="complexity"
-                                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
-                                <option value="">Todas</option>
-                                <option value="baixa" {{ $complexity === 'baixa' ? 'selected' : '' }}>Baixa</option>
-                                <option value="media" {{ $complexity === 'media' ? 'selected' : '' }}>Média</option>
-                                <option value="alta" {{ $complexity === 'alta' ? 'selected' : '' }}>Alta</option>
-                            </select>
+                        <div class="flex flex-col gap-2 md:flex-row md:items-center">
+                            <div class="flex items-center gap-2 md:w-[250px]">
+                                <label for="complexity" class="text-sm font-medium text-slate-700 whitespace-nowrap">Complexidade:</label>
+                                <select id="complexity" name="complexity"
+                                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                    <option value="">Todas</option>
+                                    <option value="baixa" {{ $complexity === 'baixa' ? 'selected' : '' }}>Baixa</option>
+                                    <option value="media" {{ $complexity === 'media' ? 'selected' : '' }}>M&eacute;dia</option>
+                                    <option value="alta" {{ $complexity === 'alta' ? 'selected' : '' }}>Alta</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center gap-2 md:w-[230px]">
+                                <label for="ano_base" class="text-sm font-medium text-slate-700 whitespace-nowrap">Ano-base:</label>
+                                <select id="ano_base" name="ano_base"
+                                        class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                    <option value="">Todos</option>
+                                    @foreach ($anoBaseOptions as $year)
+                                        <option value="{{ $year }}" {{ $anoBase === $year ? 'selected' : '' }}>{{ $year }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -133,3 +145,4 @@
         </div>
     </div>
 @endsection
+

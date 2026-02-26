@@ -148,27 +148,35 @@
                             <div x-show="showComplexityModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" @click.self="showComplexityModal = false" @keydown.escape.window="showComplexityModal = false">
                                 <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
                                     <div class="flex items-center justify-between">
-                                        <h3 class="text-base font-semibold text-slate-900">Classificacao de complexidade</h3>
+                                        <h3 class="text-base font-semibold text-slate-900">Classifica&ccedil;&atilde;o de complexidade</h3>
                                         <button type="button" @click="showComplexityModal = false" class="cursor-pointer text-sm text-slate-500 hover:text-slate-700">Fechar</button>
                                     </div>
                                     <div class="mt-3 space-y-2 text-sm text-slate-700">
-                                        <div>Pontuacao total = soma dos itens de volume (1 ponto por ocorrencia) + itens de alta complexidade.</div>
-                                        <div>Alta complexidade: Renda variavel = +20 pontos; Atividade rural = +10 pontos.</div>
-                                        <div>Faixas: Baixa (0 a 9), Media (10 a 29), Alta (30+).</div>
+                                        <div>Pontua&ccedil;&atilde;o total = soma dos itens de volume (1 ponto por ocorr&ecirc;ncia) + itens de alta complexidade.</div>
+                                        <div>Alta complexidade: Renda vari&aacute;vel = +20 pontos; Atividade rural = +10 pontos.</div>
+                                        <div>Faixas: Baixa (0 a 9), M&eacute;dia (10 a 29), Alta (30+).</div>
+                                        @php
+                                            $complexityResultLabel = match ($declaration->complexity_level) {
+                                                'alta' => 'Alta',
+                                                'media' => 'M&eacute;dia',
+                                                'baixa' => 'Baixa',
+                                                default => 'N&atilde;o classificada',
+                                            };
+                                        @endphp
                                         <div class="pt-1 font-semibold text-slate-900">
-                                            Resultado desta declaracao: {{ ucfirst($declaration->complexity_level ?? 'nao classificada') }} ({{ (int) ($declaration->complexity_score ?? 0) }} pontos)
+                                            Resultado desta declara&ccedil;&atilde;o: {!! $complexityResultLabel !!} ({{ (int) ($declaration->complexity_score ?? 0) }} pontos)
                                         </div>
                                     </div>
                                     <div class="mt-4 border-t border-slate-100/70 pt-4">
-                                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Criterios desta declaracao</div>
+                                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Crit&eacute;rios desta declara&ccedil;&atilde;o</div>
                                         @if (empty($complexityBreakdown))
-                                            <div class="text-sm text-slate-600">Detalhamento indisponivel para esta declaracao.</div>
+                                            <div class="text-sm text-slate-600">Detalhamento indispon&iacute;vel para esta declara&ccedil;&atilde;o.</div>
                                         @else
                                             <div class="overflow-x-auto">
                                                 <table class="min-w-full text-sm text-slate-800">
                                                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                                                         <tr>
-                                                            <th class="px-3 py-2 text-left">Criterio</th>
+                                                            <th class="px-3 py-2 text-left">Crit&eacute;rio</th>
                                                             <th class="px-3 py-2 text-right">Base</th>
                                                             <th class="px-3 py-2 text-right">Multiplicador</th>
                                                             <th class="px-3 py-2 text-right">Pontos</th>

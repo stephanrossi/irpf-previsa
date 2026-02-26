@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\Declaration;
 use App\Services\ParseDecFileService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -18,6 +19,15 @@ class ClientController extends Controller
         $complexityRequested = strtolower(trim((string) $request->string('complexity')));
         $allowedComplexities = ['baixa', 'media', 'alta'];
         $complexity = in_array($complexityRequested, $allowedComplexities, true) ? $complexityRequested : '';
+        $anoBaseRequested = trim((string) $request->string('ano_base'));
+        $anoBase = ctype_digit($anoBaseRequested) ? (int) $anoBaseRequested : null;
+        $anoBaseOptions = Declaration::query()
+            ->select('ano_base')
+            ->distinct()
+            ->orderByDesc('ano_base')
+            ->pluck('ano_base')
+            ->map(fn ($year) => (int) $year)
+            ->values();
         $riskOnly = $request->boolean('risk_only');
         $retificadoraOnly = $request->boolean('retificadora_only');
         $perPageRequested = (int) $request->integer('per_page', 20);
@@ -52,6 +62,9 @@ class ClientController extends Controller
             ->when($complexity !== '', function ($query) use ($complexity) {
                 $query->whereHas('declarations', fn ($q) => $q->where('complexity_level', $complexity));
             })
+            ->when($anoBase !== null, function ($query) use ($anoBase) {
+                $query->whereHas('declarations', fn ($q) => $q->where('ano_base', $anoBase));
+            })
             ->when($retificadoraOnly, function ($query) {
                 $query->whereHas('declarations', fn ($q) => $q->where('last_is_retificadora', true));
             })
@@ -63,6 +76,8 @@ class ClientController extends Controller
             'clients' => $clients,
             'search' => $search,
             'complexity' => $complexity,
+            'anoBase' => $anoBase,
+            'anoBaseOptions' => $anoBaseOptions,
             'riskOnly' => $riskOnly,
             'retificadoraOnly' => $retificadoraOnly,
             'perPage' => $perPage,
