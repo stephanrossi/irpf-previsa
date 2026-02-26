@@ -14,6 +14,9 @@ class DecExpenseExtractor
 
     private array $totals = [];
     private float $totalIrPago = 0.0;
+    private float $totalPagamentosEfetuados = 0.0;
+    private float $totalDoacoesEfetuadas = 0.0;
+    private array $doacoesCodes = ['80', '81'];
 
     public function __construct()
     {
@@ -34,6 +37,10 @@ class DecExpenseExtractor
         $vrPagto = $this->parseMoney($this->slice($line, 106, 118));
         $vrReduc = $this->parseMoney($this->slice($line, 119, 131));
         $liquido = max(0, $vrPagto - $vrReduc);
+        $this->totalPagamentosEfetuados += $vrPagto;
+        if (in_array($code, $this->doacoesCodes, true)) {
+            $this->totalDoacoesEfetuadas += $vrPagto;
+        }
 
         foreach ($this->totals as $key => &$info) {
             if (in_array($code, $info['codes'], true)) {
@@ -65,6 +72,8 @@ class DecExpenseExtractor
             'total_pensao_judicial' => $this->totals['pensao_judicial']['liquido'],
             'total_pgbl' => $this->totals['pgbl']['liquido'],
             'total_ir_pago' => $this->totalIrPago,
+            'total_pagamentos_efetuados' => $this->totalPagamentosEfetuados,
+            'total_doacoes_efetuadas' => $this->totalDoacoesEfetuadas,
             'gastos_declarados_total' => $gastosDeclaradosTotal,
             'gastos_declarados_breakdown' => array_merge($this->totals, [
                 'ir_pago' => [

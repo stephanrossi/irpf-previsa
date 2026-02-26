@@ -19,7 +19,6 @@ class ImportDecRequest extends FormRequest
                 'required',
                 'file',
                 'max:5120',
-                'mimetypes:text/plain,application/octet-stream',
                 function (string $attribute, $value, $fail) {
                     $extension = strtolower((string) $value?->getClientOriginalExtension());
 
@@ -40,7 +39,6 @@ class ImportDecRequest extends FormRequest
             'files.*.required' => 'Arquivo obrigatório.',
             'files.*.file' => 'Envie arquivos válidos.',
             'files.*.max' => 'Cada arquivo não pode ultrapassar 5MB.',
-            'files.*.mimetypes' => 'Formato inválido. Envie um arquivo texto .DEC.',
         ];
     }
 }

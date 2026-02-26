@@ -6,10 +6,10 @@
     <div class="space-y-6">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-2xl font-semibold text-slate-900">Importar declaração (.DEC)</h1>
-                <p class="text-sm text-slate-600">O arquivo é armazenado em storage privado. CPF é tratado de forma sigilosa.</p>
+                <h1 class="text-2xl font-semibold text-slate-900">Importar declara&ccedil;&atilde;o (.DEC)</h1>
+                <p class="text-sm text-slate-600">O arquivo &eacute; armazenado em storage privado. CPF &eacute; tratado de forma sigilosa.</p>
             </div>
-            <a href="{{ route('clients.index') }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>
+            <a href="{{ route('clients.index') }}" class="text-sm text-slate-600 hover:text-slate-900">&larr; Voltar</a>
         </div>
 
         <form x-data="importForm()" x-on:submit.prevent="startLoading" action="{{ route('import.store') }}" method="POST" enctype="multipart/form-data"
@@ -23,14 +23,42 @@
                         Escolher arquivos
                     </label>
                 </div>
-                <input id="files" name="files[]" type="file" accept=".dec,text/plain" multiple class="sr-only">
-                <p class="text-sm text-slate-600">Envie um ou mais arquivos .DEC (máx 5MB cada).</p>
+                <input id="files" name="files[]" type="file" accept=".dec,.DEC" multiple class="sr-only" @change="syncSelectedFiles()">
+                <p class="text-sm text-slate-600">Envie um ou mais arquivos .DEC (m&aacute;x 5MB cada).</p>
                 @error('files')
                     <div class="text-sm text-red-600">{{ $message }}</div>
                 @enderror
                 @error('files.*')
                     <div class="text-sm text-red-600">{{ $message }}</div>
                 @enderror
+
+                <div x-cloak x-show="selectedFiles.length > 0" class="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-sm">
+                    <div class="mb-2 font-medium text-slate-800" x-text="loading ? 'Arquivos sendo importados' : 'Arquivos selecionados para importacao'"></div>
+                    <div class="mb-2 text-xs text-slate-600">
+                        <span x-text="selectedFiles.length"></span> arquivo(s)
+                    </div>
+
+                    <ul class="space-y-1 text-slate-700">
+                        <template x-for="(fileName, idx) in visibleFiles" :key="fileName + idx">
+                            <li class="truncate" x-text="fileName"></li>
+                        </template>
+                    </ul>
+
+                    <div x-show="hiddenFiles.length > 0" class="mt-2 border-t border-slate-200 pt-2">
+                        <button type="button"
+                                @click="showAllFiles = !showAllFiles"
+                                class="cursor-pointer text-xs font-medium text-slate-700 underline underline-offset-2">
+                            <span x-show="!showAllFiles">Mostrar mais <span x-text="hiddenFiles.length"></span> arquivo(s)</span>
+                            <span x-show="showAllFiles">Ocultar arquivos</span>
+                        </button>
+
+                        <ul x-show="showAllFiles" x-cloak class="mt-2 space-y-1 text-slate-700">
+                            <template x-for="(fileName, idx) in hiddenFiles" :key="'hidden-' + fileName + idx">
+                                <li class="truncate" x-text="fileName"></li>
+                            </template>
+                        </ul>
+                    </div>
+                </div>
             </div>
 
             <button type="submit"
@@ -68,11 +96,45 @@
                 loading: false,
                 progress: 0,
                 progressLabel: '',
+                selectedFiles: [],
+                showAllFiles: false,
                 showModal: false,
                 modalMessage: '',
+                get visibleFiles() {
+                    return this.selectedFiles.slice(0, 5);
+                },
+                get hiddenFiles() {
+                    return this.selectedFiles.slice(5);
+                },
+                syncSelectedFiles() {
+                    const input = document.getElementById('files');
+                    const files = input?.files ? Array.from(input.files) : [];
+                    this.selectedFiles = files.map(file => file.name);
+                    this.showAllFiles = false;
+                },
                 showMessage(msg) {
                     this.modalMessage = msg;
                     this.showModal = true;
+                },
+                extractServerMessage(payload) {
+                    if (!payload || typeof payload !== 'object') {
+                        return null;
+                    }
+
+                    if (payload.errors && typeof payload.errors === 'object') {
+                        const firstKey = Object.keys(payload.errors)[0];
+                        const firstValue = firstKey ? payload.errors[firstKey] : null;
+
+                        if (Array.isArray(firstValue) && firstValue.length > 0) {
+                            return firstValue[0];
+                        }
+                    }
+
+                    if (typeof payload.message === 'string' && payload.message.trim() !== '') {
+                        return payload.message;
+                    }
+
+                    return null;
                 },
                 async startLoading() {
                     const input = document.getElementById('files');
@@ -80,6 +142,7 @@
                         this.showMessage('Selecione pelo menos um arquivo .DEC.');
                         return;
                     }
+                    this.syncSelectedFiles();
                     this.loading = true;
                     this.progress = 0;
                     this.progressLabel = 'Enviando arquivos...';
@@ -90,37 +153,63 @@
                         fd.append('files[]', input.files[i]);
                     }
 
-                    await this.uploadWithProgress(fd, input.files.length);
+                    try {
+                        await this.uploadWithProgress(fd);
+                    } catch (e) {
+                        // Mensagem de erro ja exibida em uploadWithProgress.
+                    }
                 },
                 uploadWithProgress(fd) {
                     return new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
                         xhr.open('POST', "{{ route('import.store') }}", true);
                         xhr.setRequestHeader('Accept', 'application/json');
+                        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                        const parseJson = () => {
+                            try {
+                                return JSON.parse(xhr.responseText || '{}');
+                            } catch (_) {
+                                return null;
+                            }
+                        };
+
                         xhr.upload.onprogress = (e) => {
                             if (e.lengthComputable) {
                                 this.progress = Math.round((e.loaded / e.total) * 100);
-                                this.progressLabel = `Importando (${this.progress}%)`;
+                                this.progressLabel = 'Importando (' + this.progress + '%)';
                             }
                         };
                         xhr.onerror = () => {
-                            this.progressLabel = 'Erro ao importar. Verifique os arquivos.';
-                            this.showMessage('Erro ao importar. Verifique os arquivos.');
+                            const msg = 'Erro ao importar. Verifique os arquivos.';
+                            this.progressLabel = msg;
+                            this.showMessage(msg);
                             this.loading = false;
-                            reject();
+                            reject(new Error(msg));
                         };
                         xhr.onload = () => {
+                            const payload = parseJson();
+
                             if (xhr.status >= 200 && xhr.status < 300) {
-                                const data = JSON.parse(xhr.response || '{}');
+                                if (!payload || typeof payload !== 'object') {
+                                    const msg = 'Resposta inesperada do servidor.';
+                                    this.progressLabel = msg;
+                                    this.showMessage(msg);
+                                    this.loading = false;
+                                    reject(new Error(msg));
+                                    return;
+                                }
+
                                 this.progress = 100;
-                                this.progressLabel = 'Concluído';
-                                window.location = data.client_url || "{{ route('clients.index') }}";
+                                this.progressLabel = 'Concluido';
+                                window.location = payload.client_url || "{{ route('clients.index') }}";
                                 resolve();
                             } else {
-                                this.progressLabel = 'Erro ao importar. Verifique os arquivos.';
-                                this.showMessage('Erro ao importar. Verifique os arquivos.');
+                                const msg = this.extractServerMessage(payload) || 'Erro ao importar. Verifique os arquivos.';
+                                this.progressLabel = msg;
+                                this.showMessage(msg);
                                 this.loading = false;
-                                reject();
+                                reject(new Error(msg));
                             }
                         };
                         xhr.send(fd);
@@ -128,5 +217,6 @@
                 },
             };
         }
+
     </script>
 @endsection

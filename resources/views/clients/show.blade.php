@@ -5,14 +5,43 @@
 @section('content')
     @php
         $formatMoney = fn($value) => 'R$ ' . number_format((float) $value, 2, ',', '.');
+        $buildCaixaMetrics = function ($declaration): array {
+            $gastosEstimados = $declaration->gastos_estimados !== null ? (float) $declaration->gastos_estimados : 0.0;
+            $entradasSaidas = (
+                (float) $declaration->rend_trib_pj
+                + (float) $declaration->rend_trib_pf_exterior
+                + (float) $declaration->total_renda_isenta
+                + (float) $declaration->total_rend_exclusiva
+                + (float) $declaration->total_rend_recebidos_acumuladamente
+                + (float) $declaration->total_renda_variavel
+                + (float) $declaration->total_bens_reais
+                + (float) $declaration->total_atividade_rural_resultado_tributavel
+                - (float) $declaration->total_pagamentos_efetuados
+                - (float) $declaration->total_doacoes_efetuadas
+                - (float) $declaration->total_doacoes_partidos_politicos
+                - (float) $declaration->total_dividas_onus_reais
+                - $gastosEstimados
+            );
+
+            $evolucaoPatrimonial = (float) $declaration->total_bens_reais;
+            $caixaTotal = $entradasSaidas - $evolucaoPatrimonial;
+            $riscoCaixa = $evolucaoPatrimonial > 0 && $caixaTotal < ($evolucaoPatrimonial * 0.2);
+
+            return [
+                'gastos_estimados' => $gastosEstimados,
+                'entradas_saidas' => $entradasSaidas,
+                'evolucao_patrimonial' => $evolucaoPatrimonial,
+                'caixa_total' => $caixaTotal,
+                'risco_caixa' => $riscoCaixa,
+            ];
+        };
         $timeline = $declarations->sortBy('ano_base')->values();
         $chartPayload = [
             'years' => $timeline->pluck('ano_base')->values(),
-            'rendimentos' => $timeline->pluck('total_rend_tributaveis')->map(fn ($v) => (float) $v)->values(),
+            'rendimentos' => $timeline->map(fn ($d) => (float) $d->rend_trib_pj + (float) $d->rend_trib_pf_exterior)->values(),
             'renda_isenta' => $timeline->pluck('total_renda_isenta')->map(fn ($v) => (float) $v)->values(),
-            'bens' => $timeline->pluck('total_bens_imoveis')->map(fn ($v) => (float) $v)->values(),
-            'dividas' => $timeline->pluck('total_dividas_onus')->map(fn ($v) => (float) $v)->values(),
-            'bens_ano' => $timeline->pluck('total_bens_adquiridos_ano')->map(fn ($v) => (float) $v)->values(),
+            'bens' => $timeline->pluck('total_bens_reais')->map(fn ($v) => (float) $v)->values(),
+            'dividas' => $timeline->pluck('total_dividas_onus_reais')->map(fn ($v) => (float) $v)->values(),
         ];
     @endphp
 
@@ -28,7 +57,7 @@
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <a href="{{ route('clients.index', request()->query()) }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>
+                <a href="{{ route('clients.index', request()->query()) }}" class="text-sm text-slate-600 hover:text-slate-900">&larr; Voltar</a>
                 <a href="{{ route('import.create') }}"
                    class="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800">
                     Importar novo .DEC
@@ -38,13 +67,17 @@
 
         @if ($declarations->isEmpty())
             <div class="rounded-xl border border-slate-200 bg-white/80 p-6 text-sm text-slate-700 shadow-sm">
-                Nenhuma declaração importada para este cliente ainda.
+                Nenhuma declara&ccedil;&atilde;o importada para este cliente ainda.
             </div>
         @else
             <div class="space-y-6">
                 <div class="space-y-4">
                     <div class="flex flex-wrap gap-2">
                         @foreach ($declarations as $declaration)
+                            @php
+                                $caixaMetrics = $buildCaixaMetrics($declaration);
+                                $limiteRisco = (float) $caixaMetrics['evolucao_patrimonial'] * 0.2;
+                            @endphp
                             <button
                                 type="button"
                                 @click="tab = '{{ $declaration->ano_base }}'"
@@ -53,10 +86,18 @@
                                     : 'bg-white text-slate-800 border border-slate-200 hover:bg-slate-100 hover:border-slate-300'"
                                 class="rounded-full px-4 py-2 text-sm font-medium transition cursor-pointer">
                                 <span class="inline-flex items-center gap-2">
-                                    Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}
-                                    @if ($declaration->risco_variacao_patrimonial)
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
-                                            ● Risco
+                                    IR {{ $declaration->exercicio }} - Ano base {{ $declaration->ano_base }}
+                                    @if ($caixaMetrics['risco_caixa'])
+                                        <span class="relative inline-flex" x-data="{ showRiskCalc: false }" @mouseenter="showRiskCalc = true" @mouseleave="showRiskCalc = false">
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+                                                &bull; Risco
+                                            </span>
+                                            <div x-show="showRiskCalc" x-cloak class="pointer-events-none absolute left-1/2 top-full z-30 mt-2 w-72 -translate-x-1/2 rounded-lg border border-slate-200 bg-white p-3 text-left text-[11px] text-slate-700 shadow-lg">
+                                                <div class="font-semibold text-slate-800">C&aacute;lculo do risco</div>
+                                                <div class="mt-1">Caixa: {{ $formatMoney($caixaMetrics['caixa_total']) }}</div>
+                                                <div>20% Evolu&ccedil;&atilde;o Patrimonial: {{ $formatMoney($limiteRisco) }}</div>
+                                                <div class="mt-1">Regra: Caixa &lt; 20% da Evolu&ccedil;&atilde;o Patrimonial.</div>
+                                            </div>
                                         </span>
                                     @endif
                                 </span>
@@ -69,25 +110,19 @@
                     </div>
 
                     @foreach ($declarations as $declaration)
+                        @php
+                            $caixaMetrics = $buildCaixaMetrics($declaration);
+                            $totalRendTributaveis = (float) $declaration->rend_trib_pj + (float) $declaration->rend_trib_pf_exterior;
+                        @endphp
                         <div x-show="tab === '{{ $declaration->ano_base }}'" class="space-y-4" x-cloak>
                             <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600">
                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
                                     {{ ucfirst($declaration->tipo) }}
                                 </span>
-                                <span class="text-slate-400">•</span>
+                                <span class="text-slate-400">&bull;</span>
                                 <span>Importado em {{ $declaration->imported_at?->format('d/m/Y H:i') }}</span>
-                                <span class="text-slate-400">•</span>
-                                @if ($declaration->risco_variacao_patrimonial)
-                                    <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
-                                        EM RISCO
-                                        <span class="text-red-600">Variação a descoberto: {{ $formatMoney($declaration->variacao_patrimonial_descoberto) }}</span>
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                        OK
-                                    </span>
-                                @endif
                                 @if ($declaration->last_is_retificadora)
+                                    <span class="text-slate-400">&bull;</span>
                                     <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
                                         Retificadora
                                         @if ($declaration->last_recibo_anterior)
@@ -95,46 +130,132 @@
                                         @endif
                                     </span>
                                 @endif
-                                <a href="{{ route('declarations.report', $declaration) }}" class="text-xs font-medium text-slate-800 underline underline-offset-2">
-                                    Ver Relatório de Inconsistência
-                                </a>
                             </div>
 
-                            <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm" x-data="{ showCaixaFormula: false }" @keydown.escape.window="showCaixaFormula = false">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div class="text-sm text-slate-600">Caixa</div>
+                                    <button type="button"
+                                            @click="showCaixaFormula = true"
+                                            class="cursor-pointer text-xs text-slate-500 hover:text-slate-700">
+                                        Ver c&aacute;lculo
+                                    </button>
+                                </div>
+                                <div id="caixa-value-{{ $declaration->id }}" class="mt-2 text-3xl font-bold tracking-tight text-slate-900">{{ $formatMoney($caixaMetrics['caixa_total']) }}</div>
+                                <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                    <div>Entradas e Sa&iacute;das: {{ $formatMoney($caixaMetrics['entradas_saidas']) }}</div>
+                                    <div aria-hidden="true">-</div>
+                                    <div>Evolu&ccedil;&atilde;o Patrimonial: {{ $formatMoney($caixaMetrics['evolucao_patrimonial']) }}</div>
+                                </div>
+                                <div x-show="showCaixaFormula" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" @click.self="showCaixaFormula = false">
+                                    <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+                                        <div class="flex items-center justify-between">
+                                            <h3 class="text-base font-semibold text-slate-900">C&aacute;lculo do Caixa</h3>
+                                            <button type="button" @click="showCaixaFormula = false" class="cursor-pointer text-sm text-slate-500 hover:text-slate-700">Fechar</button>
+                                        </div>
+                                        <div class="mt-3 text-sm text-slate-700">
+                                            Entradas e Sa&iacute;das = PJ + PF/Exterior + Isentos + Exclusiva + Acumulados + Renda Vari&aacute;vel + Evolu&ccedil;&atilde;o Patrimonial + Atividade Rural - Pagamentos - Doa&ccedil;&otilde;es - Doa&ccedil;&otilde;es a Partidos - D&iacute;vidas - Gastos Estimados.
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-4 md:grid-cols-3">
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                                    <div class="text-sm text-slate-600">Rendimentos tributáveis</div>
-                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_rend_tributaveis) }}</div>
+                                    <div class="text-sm text-slate-600">Rendimentos tribut&aacute;veis</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($totalRendTributaveis) }}</div>
+                                    <div class="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
+                                        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                                            <span>Recebimentos PJ (Rend PJ - Prev Oficial - IR Fonte + 13o - IR 13o)</span>
+                                            <span class="whitespace-nowrap text-right font-medium tabular-nums text-slate-800">{{ $formatMoney($declaration->rend_trib_pj) }}</span>
+                                        </div>
+                                        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                                            <span>Recebimentos PF/Exterior (Rendimentos - Deducoes - Carne-leao)</span>
+                                            <span class="whitespace-nowrap text-right font-medium tabular-nums text-slate-800">{{ $formatMoney($declaration->rend_trib_pf_exterior) }}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                                     <div class="text-sm text-slate-600">Renda isenta</div>
                                     <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_renda_isenta) }}</div>
                                 </div>
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                                    <div class="text-sm text-slate-600">Bens imóveis</div>
-                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_bens_imoveis) }}</div>
+                                    <div class="text-sm text-slate-600">Rend. Trib. Exclusiva/Definitiva</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_rend_exclusiva) }}</div>
                                 </div>
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                                    <div class="text-sm text-slate-600">Dívidas e ônus</div>
-                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_dividas_onus) }}</div>
+                                    <div class="text-sm text-slate-600">Rendimentos recebidos acumuladamente</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_rend_recebidos_acumuladamente) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">C&aacute;lculo: Rendimentos - IRRF.</div>
                                 </div>
-                            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                                <div class="text-sm text-slate-600">Bens adquiridos no ano</div>
-                                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_bens_adquiridos_ano) }}</div>
-                            </div>
-                            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm" x-data="gastosForm({{ $declaration->id }}, {{ $declaration->gastos_estimados !== null ? (float) $declaration->gastos_estimados : 'null' }}, '{{ route('declarations.update-gastos', $declaration) }}')">
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Renda vari&aacute;vel (opera&ccedil;&otilde;es comuns / day trade)</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_renda_variavel) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">Jan-Nov: base comum - 15% e base day trade - 20%. Dezembro: somente bases.</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Pagamentos efetuados</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_pagamentos_efetuados) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">Soma dos valores pagos informados na ficha de pagamentos efetuados.</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Doa&ccedil;&otilde;es efetuadas</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_doacoes_efetuadas) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">Soma dos valores pagos informados na ficha de doa&ccedil;&otilde;es efetuadas.</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Doa&ccedil;&otilde;es a partidos pol&iacute;ticos</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_doacoes_partidos_politicos) }}</div>
+                                    <div class="mt-1 text-xs text-slate-500">Soma da ficha de doa&ccedil;&otilde;es a partidos pol&iacute;ticos e candidatos.</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Atividade rural (resultado tribut&aacute;vel)</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_atividade_rural_resultado_tributavel) }}</div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">Bens</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_bens_reais) }}</div>
+                                    <div class="mt-2 space-y-1 text-xs text-slate-500">
+                                        <div>{{ $declaration->ano_base }}: {{ $formatMoney($declaration->total_bens_ano_atual) }}</div>
+                                        <div>{{ $declaration->ano_base - 1 }}: {{ $formatMoney($declaration->total_bens_ano_anterior) }}</div>
+                                        <div>F&oacute;rmula: {{ $declaration->ano_base }} - {{ $declaration->ano_base - 1 }}</div>
+                                    </div>
+                                </div>
+                                <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                                    <div class="text-sm text-slate-600">D&iacute;vidas e &ocirc;nus reais</div>
+                                    <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_dividas_onus_reais) }}</div>
+                                    <div class="mt-2 space-y-1 text-xs text-slate-500">
+                                        <div>{{ $declaration->ano_base }}: {{ $formatMoney($declaration->total_dividas_ano_atual) }}</div>
+                                        <div>{{ $declaration->ano_base - 1 }}: {{ $formatMoney($declaration->total_dividas_ano_anterior) }}</div>
+                                        <div>F&oacute;rmula: {{ $declaration->ano_base }} - {{ $declaration->ano_base - 1 }}</div>
+                                    </div>
+                                </div>
+                            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm" x-data="gastosForm({{ $declaration->id }}, {{ $declaration->gastos_estimados !== null ? (float) $declaration->gastos_estimados : 'null' }}, '{{ route('declarations.update-gastos', $declaration) }}', {{ (float) ($caixaMetrics['caixa_total'] + $caixaMetrics['gastos_estimados']) }})">
                                     <div class="flex items-center justify-between">
                                         <div class="text-sm text-slate-600">Gastos estimados</div>
-                                        <button type="button" @click="saveNow()" class="text-xs font-medium text-slate-800 underline underline-offset-2">Recalcular</button>
+                                        <button type="button"
+                                                @click="saveNow()"
+                                                :disabled="saving"
+                                                :class="saving ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'"
+                                                class="text-xs font-medium text-slate-800 underline underline-offset-2">
+                                            Recalcular
+                                        </button>
                                     </div>
-                                    <div class="mt-2 flex items-center gap-2">
-                                        <input type="number" step="0.01" min="0" x-model="valor"
-                                               @input="debouncedSave()"
-                                               class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                    <div class="mt-2">
+                                        <div class="relative">
+                                            <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-slate-500">R$</span>
+                                            <input type="text"
+                                                   inputmode="numeric"
+                                                   :value="displayValue"
+                                                   placeholder="0,00"
+                                                   @input="applyMask($event)"
+                                                   class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-12 pr-3 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                        </div>
                                     </div>
                                     <div class="mt-2 text-xs text-slate-600" x-text="statusText"></div>
                                 </div>
                             </div>
-                            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm md:col-span-2" x-data="gastosDeclaradosChart({{ $declaration->id }}, @js($declaration->gastos_declarados_breakdown ?? []), {{ (float) $declaration->gastos_declarados_total }})" x-init="render()">
+                            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm md:col-span-2 lg:col-span-3" x-data="gastosDeclaradosChart({{ $declaration->id }}, @js($declaration->gastos_declarados_breakdown ?? []), {{ (float) $declaration->gastos_declarados_total }})" x-init="render()">
                                 <div class="flex flex-wrap items-center justify-between gap-3">
                                     <div>
                                         <div class="text-sm text-slate-600">Gastos declarados</div>
@@ -142,7 +263,7 @@
                                     </div>
                                     <template x-if="hasZero">
                                         <div class="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-                                            Algumas categorias estão zeradas (sem dados)
+                                            Algumas categorias est&atilde;o zeradas (sem dados)
                                         </div>
                                     </template>
                                 </div>
@@ -153,8 +274,8 @@
                                                 <tr>
                                                     <th class="px-3 py-2">Categoria</th>
                                                     <th class="px-3 py-2">Bruto</th>
-                                                    <th class="px-3 py-2">Redução</th>
-                                                    <th class="px-3 py-2">Líquido</th>
+                                                    <th class="px-3 py-2">Redu&ccedil;&atilde;o</th>
+                                                    <th class="px-3 py-2">L&iacute;quido</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -180,15 +301,15 @@
 
                 <div x-data="clientCharts()" x-init="renderCharts()" class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                     <div class="mb-3">
-                        <div class="text-sm font-medium text-slate-800">Evolução dos valores</div>
+                        <div class="text-sm font-medium text-slate-800">Evolu&ccedil;&atilde;o dos valores</div>
                         <p class="text-xs text-slate-500">Linha do tempo por ano-base</p>
                     </div>
                     <template x-if="years.length === 0">
-                        <div class="text-sm text-slate-600">Sem dados suficientes para gráficos.</div>
+                        <div class="text-sm text-slate-600">Sem dados suficientes para gr&aacute;ficos.</div>
                     </template>
-                    <div x-show="years.length" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    <div x-show="years.length" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                         <div class="space-y-2 rounded-lg border border-slate-100 bg-white p-3 h-64">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Rendimentos tributáveis</div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Rendimentos tribut&aacute;veis</div>
                             <canvas id="chartRendimentos" class="h-full w-full"></canvas>
                         </div>
                         <div class="space-y-2 rounded-lg border border-slate-100 bg-white p-3 h-64">
@@ -196,16 +317,12 @@
                             <canvas id="chartRendaIsenta" class="h-full w-full"></canvas>
                         </div>
                         <div class="space-y-2 rounded-lg border border-slate-100 bg-white p-3 h-64">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Bens imóveis</div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Bens</div>
                             <canvas id="chartBens" class="h-full w-full"></canvas>
                         </div>
                         <div class="space-y-2 rounded-lg border border-slate-100 bg-white p-3 h-64">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Dívidas e ônus</div>
+                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">D&iacute;vidas e &ocirc;nus reais</div>
                             <canvas id="chartDividas" class="h-full w-full"></canvas>
-                        </div>
-                        <div class="space-y-2 rounded-lg border border-slate-100 bg-white p-3 h-64">
-                            <div class="text-xs font-semibold uppercase tracking-wide text-slate-700">Bens adquiridos no ano</div>
-                            <canvas id="chartBensAno" class="h-full w-full"></canvas>
                         </div>
                     </div>
                 </div>
@@ -223,11 +340,10 @@
                     renderCharts() {
                         if (!this.years.length || typeof Chart === 'undefined') return;
 
-                        this.buildChart('chartRendimentos', 'Rendimentos tributáveis', payload.rendimentos, '#0f172a');
+                        this.buildChart('chartRendimentos', 'Rendimentos tribut\u00E1veis', payload.rendimentos, '#0f172a');
                         this.buildChart('chartRendaIsenta', 'Renda isenta', payload.renda_isenta, '#0ea5e9');
-                        this.buildChart('chartBens', 'Bens imóveis', payload.bens, '#111827');
-                        this.buildChart('chartDividas', 'Dívidas e ônus', payload.dividas, '#dc2626');
-                        this.buildChart('chartBensAno', 'Bens adquiridos no ano', payload.bens_ano, '#2563eb');
+                        this.buildChart('chartBens', 'Bens', payload.bens, '#111827');
+                        this.buildChart('chartDividas', 'D\u00EDvidas e \u00F4nus reais', payload.dividas, '#dc2626');
                     },
                     buildChart(canvasId, label, data, color) {
                         const el = document.getElementById(canvasId);
@@ -260,18 +376,38 @@
                     },
                 };
             }
-            function gastosForm(id, initial, url) {
+            function gastosForm(id, initial, url, caixaBaseSemGastos) {
+                const toDigits = (value) => {
+                    if (value === null || value === '' || typeof value === 'undefined') return '';
+                    const cents = Math.round(Number(value) * 100);
+                    if (!Number.isFinite(cents) || cents < 0) return '';
+                    return String(cents);
+                };
+
+                const formatFromDigits = (digits) => {
+                    if (!digits) return '';
+                    const cents = Number(digits);
+                    if (!Number.isFinite(cents)) return '';
+                    return (cents / 100).toLocaleString('pt-BR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                    });
+                };
+
                 return {
-                    valor: initial,
+                    rawDigits: toDigits(initial),
+                    displayValue: formatFromDigits(toDigits(initial)),
                     statusText: initial !== null ? 'Salvo' : 'Informe para refinar o risco',
-                    timeout: null,
                     saving: false,
-                    debouncedSave() {
-                        clearTimeout(this.timeout);
-                        this.timeout = setTimeout(() => this.saveNow(), 800);
+                    caixaBaseSemGastos: Number(caixaBaseSemGastos || 0),
+                    applyMask(event) {
+                        const digits = event.target.value.replace(/\D/g, '');
+                        this.rawDigits = digits;
+                        this.displayValue = formatFromDigits(digits);
+                        this.statusText = 'Clique em Recalcular para aplicar no Caixa.';
                     },
                     saveNow() {
-                        const parsed = this.valor === null || this.valor === '' ? null : parseFloat(this.valor);
+                        const parsed = this.rawDigits === '' ? null : Number(this.rawDigits) / 100;
                         this.saving = true;
                         fetch(url, {
                             method: 'PATCH',
@@ -288,7 +424,15 @@
                             }
                             return res.json();
                         }).then(data => {
-                            this.statusText = data.message + ' (' + data.status + (data.variacao ? ' • Variação: R$ ' + data.variacao : '') + ')';
+                            const detalhesRisco = (data.caixa && data.limite)
+                                ? ' \u2022 Caixa: R$ ' + data.caixa + ' \u2022 Limite (20%): R$ ' + data.limite
+                                : '';
+                            this.statusText = data.message + ' (' + data.status + detalhesRisco + ')';
+                            const caixaEl = document.getElementById('caixa-value-' + id);
+                            if (caixaEl) {
+                                const novoCaixa = this.caixaBaseSemGastos - (parsed ?? 0);
+                                caixaEl.textContent = formatCurrencyBRL(novoCaixa);
+                            }
                         }).catch(() => {
                             this.statusText = 'Erro ao salvar. Tente novamente.';
                         }).finally(() => {
@@ -302,10 +446,10 @@
             }
             function gastosDeclaradosChart(id, breakdown, total) {
                 const labels = {
-                    planos_saude: 'Planos de Saúde',
-                    medicas_odont: 'Médicas/Odonto',
-                    instrucao: 'Instrução',
-                    pensao_judicial: 'Pensão judicial',
+                    planos_saude: 'Planos de Sa\u00FAde',
+                    medicas_odont: 'M\u00E9dicas/Odonto',
+                    instrucao: 'Instru\u00E7\u00E3o',
+                    pensao_judicial: 'Pens\u00E3o judicial',
                     pgbl: 'PGBL',
                     ir_pago: 'IR pago',
                 };

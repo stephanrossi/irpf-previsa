@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\ImportDecFileAction;
 use App\Http\Requests\ImportDecRequest;
-use Symfony\Component\HttpFoundation\Response;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class ImportDeclarationController extends Controller
 {
@@ -28,17 +28,23 @@ class ImportDeclarationController extends Controller
             $declarations[] = $declaration;
         }
 
+        $totalImported = count($declarations);
         $firstClient = $declarations[0]->client ?? null;
-        $message = sprintf('%d declarações importadas com sucesso.', count($declarations));
+        $redirectUrl = ($totalImported === 1 && $firstClient)
+            ? route('clients.show', $firstClient)
+            : route('clients.index');
+        $message = $totalImported === 1
+            ? '1 declaração importada com sucesso.'
+            : sprintf('%d declarações importadas com sucesso.', $totalImported);
 
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => $message,
-                'client_url' => $firstClient ? route('clients.show', $firstClient) : route('clients.index'),
+                'client_url' => $redirectUrl,
             ]);
         }
 
-        if ($firstClient) {
+        if ($totalImported === 1 && $firstClient) {
             return redirect()
                 ->route('clients.show', $firstClient)
                 ->with('status', $message);

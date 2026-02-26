@@ -39,6 +39,7 @@ class DecExpenseExtractorTest extends TestCase
         $this->assertEqualsWithDelta(140.00, $result['gastos_declarados_total'], 0.001); // (80+50) + 10 IR
         $this->assertEqualsWithDelta(130.00, $result['total_planos_saude'], 0.001);
         $this->assertEqualsWithDelta(10.00, $result['total_ir_pago'], 0.001);
+        $this->assertEqualsWithDelta(150.00, $result['total_pagamentos_efetuados'], 0.001);
         $this->assertSame(2, $result['gastos_declarados_breakdown']['planos_saude']['itens']);
     }
 
@@ -62,5 +63,28 @@ class DecExpenseExtractorTest extends TestCase
 
         $this->assertEqualsWithDelta(10.00, $result['total_pgbl'], 0.001);
         $this->assertEqualsWithDelta(20.00, $result['total_despesas_medicas_odont'], 0.001);
+        $this->assertEqualsWithDelta(30.00, $result['total_pagamentos_efetuados'], 0.001);
+    }
+
+    public function test_sums_doacoes_efetuadas_for_specific_codes(): void
+    {
+        $service = new DecExpenseExtractor();
+        $doacao = $this->buildLine('26', [
+            [14, 15, '80'],
+            [106, 118, str_pad('15000', 13, '0', STR_PAD_LEFT)], // 150.00
+            [119, 131, str_pad('5000', 13, '0', STR_PAD_LEFT)], // 50.00
+        ]);
+        $pagamento = $this->buildLine('26', [
+            [14, 15, '21'],
+            [106, 118, str_pad('20000', 13, '0', STR_PAD_LEFT)], // 200.00
+            [119, 131, str_pad('0', 13, '0', STR_PAD_LEFT)],
+        ]);
+
+        $service->addPaymentLine($doacao);
+        $service->addPaymentLine($pagamento);
+        $result = $service->result();
+
+        $this->assertEqualsWithDelta(150.00, $result['total_doacoes_efetuadas'], 0.001);
+        $this->assertEqualsWithDelta(350.00, $result['total_pagamentos_efetuados'], 0.001);
     }
 }

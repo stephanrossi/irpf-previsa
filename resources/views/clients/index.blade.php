@@ -16,12 +16,13 @@
         </div>
 
         <form method="GET" action="{{ route('clients.index') }}" class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+            <input type="hidden" name="per_page" value="{{ $perPage }}">
             <label class="block text-sm font-medium text-slate-700">Buscar por nome ou CPF</label>
-            <div class="mt-2 flex flex-col gap-3 md:flex-row md:items-center">
+            <div class="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start">
                 <input type="text" name="q" value="{{ $search }}"
                        class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
                        placeholder="Digite o nome ou CPF">
-                <div class="flex flex-wrap gap-4 text-sm text-slate-700">
+                <div class="flex flex-col gap-2 text-sm text-slate-700 lg:min-w-[260px]">
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="risk_only" value="1" {{ $riskOnly ? 'checked' : '' }} class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300 cursor-pointer">
                         <span>Somente em risco</span>
@@ -31,12 +32,14 @@
                         <span>Somente retificadoras</span>
                     </label>
                 </div>
-                <div class="flex gap-2">
+                <div class="flex flex-col gap-2 lg:min-w-[220px]">
+                    <div class="flex gap-2">
                     <button type="submit"
                             class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-slate-800 cursor-pointer">
                         Buscar
                     </button>
                     <a href="{{ route('clients.index') }}" class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Limpar</a>
+                    </div>
                 </div>
             </div>
         </form>
@@ -59,7 +62,25 @@
                    class="flex items-center gap-1 cursor-pointer">
                     NÚM. DECLARAÇÕES <span class="text-slate-400">{{ $sort === 'anos' ? ($direction === 'asc' ? '↑' : '↓') : '↕' }}</span>
                 </a>
-                <span></span>
+                <form method="GET" action="{{ route('clients.index') }}" class="flex items-center justify-end gap-1">
+                    @foreach (request()->except(['per_page', 'page']) as $key => $value)
+                        @if (is_array($value))
+                            @foreach ($value as $item)
+                                <input type="hidden" name="{{ $key }}[]" value="{{ $item }}">
+                            @endforeach
+                        @else
+                            <input type="hidden" name="{{ $key }}" value="{{ $value }}">
+                        @endif
+                    @endforeach
+                    <span class="normal-case tracking-normal text-slate-600">Qde:</span>
+                    <select name="per_page"
+                            class="rounded-md border border-slate-200 bg-white px-1.5 py-0.5 text-xs font-medium normal-case tracking-normal text-slate-700 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 cursor-pointer"
+                            onchange="this.form.submit()">
+                        <option value="20" {{ $perPage === 20 ? 'selected' : '' }}>20</option>
+                        <option value="50" {{ $perPage === 50 ? 'selected' : '' }}>50</option>
+                        <option value="100" {{ $perPage === 100 ? 'selected' : '' }}>100</option>
+                    </select>
+                </form>
             </div>
 
             @forelse ($clients as $client)

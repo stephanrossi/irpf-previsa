@@ -1,70 +1,122 @@
 @extends('layouts.app')
 
-@section('title', 'Relatório de Inconsistência')
+@section('title', 'Relatorio de Inconsistencia')
 
 @section('content')
     @php
         $fmt = fn($v) => 'R$ ' . number_format((float) $v, 2, ',', '.');
-        $rendaTrib = $payload['renda_tributavel_total'] ?? (float) $declaration->total_rend_tributaveis;
-        $rendaIsenta = $payload['total_renda_isenta'] ?? (float) $declaration->total_renda_isenta;
-        $gastosEstimados = $payload['gastos_estimados'] ?? ($declaration->gastos_estimados ?? 0);
-        $gastosDeclarados = $payload['gastos_declarados_total'] ?? (float) $declaration->gastos_declarados_total;
-        $gastosTotal = $gastosEstimados + $gastosDeclarados;
-        $bensAno = $payload['total_bens_adquiridos_ano'] ?? (float) $declaration->total_bens_adquiridos_ano;
-        $variacao = $payload['variacao_patrimonial_descoberto'] ?? (float) $declaration->variacao_patrimonial_descoberto;
-        $status = $payload['status'] ?? ($declaration->risco_variacao_patrimonial ? 'RISCO' : 'OK');
-        $risco = strtoupper($status) === 'RISCO';
+        $rendaTrib = (float) $declaration->total_rend_tributaveis;
+        $rendaIsenta = (float) $declaration->total_renda_isenta;
+        $gastosEstimados = $declaration->gastos_estimados ?? 0;
+        $gastosDeclarados = (float) $declaration->gastos_declarados_total;
+
+        $entradasSaidas = (float) ($riskMetrics['entradas_saidas'] ?? 0);
+        $evolucaoPatrimonial = (float) ($riskMetrics['evolucao_patrimonial'] ?? 0);
+        $caixaTotal = (float) ($riskMetrics['caixa_total'] ?? 0);
+        $limiteRisco = (float) ($riskMetrics['limite_risco'] ?? 0);
+        $risco = (bool) ($riskMetrics['risco'] ?? false);
     @endphp
 
     <div class="space-y-6">
-            <div class="flex items-center justify-between">
-                <div>
-                    <div class="text-sm text-slate-600">Cliente</div>
-                    <h1 class="text-2xl font-semibold text-slate-900">{{ $declaration->client->nome }}</h1>
-                    <div class="text-sm text-slate-600">CPF: {{ $declaration->client->formatted_cpf }}</div>
-                    <div class="text-sm text-slate-600">Ano-base {{ $declaration->ano_base }} · Exercício {{ $declaration->exercicio }}</div>
-                </div>
-                <div class="flex items-center gap-3">
-                    @if ($declaration->last_is_retificadora)
-                        <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
-                            Retificadora
-                            @if ($declaration->last_recibo_anterior)
-                                <span class="text-indigo-600">Recibo anterior: {{ $declaration->last_recibo_anterior }}</span>
-                            @endif
-                        </span>
-                    @endif
-                    @if ($risco)
-                        <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
-                            EM RISCO — Variação a descoberto: {{ $fmt($variacao) }}
-                        </span>
-                    @else
-                    <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-                        OK — Sem indício pela regra
+        <div class="flex items-center justify-between">
+            <div>
+                <div class="text-sm text-slate-600">Cliente</div>
+                <h1 class="text-2xl font-semibold text-slate-900">{{ $declaration->client->nome }}</h1>
+                <div class="text-sm text-slate-600">CPF: {{ $declaration->client->formatted_cpf }}</div>
+                <div class="text-sm text-slate-600">IR {{ $declaration->exercicio }} - Ano base {{ $declaration->ano_base }}</div>
+            </div>
+            <div class="flex items-center gap-3">
+                @if ($declaration->last_is_retificadora)
+                    <span class="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700">
+                        Retificadora
+                        @if ($declaration->last_recibo_anterior)
+                            <span class="text-indigo-600">Recibo anterior: {{ $declaration->last_recibo_anterior }}</span>
+                        @endif
                     </span>
                 @endif
-                <a href="{{ route('clients.show', $declaration->client) }}" class="text-sm text-slate-600 hover:text-slate-900">← Voltar</a>
+                @if ($risco)
+                    <span class="inline-flex items-center gap-2 rounded-full bg-red-50 px-4 py-2 text-sm font-semibold text-red-700">
+                        EM RISCO - Caixa abaixo de 20% da Evolucao Patrimonial
+                    </span>
+                @else
+                    <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
+                        OK - Regra de risco nao acionada
+                    </span>
+                @endif
+                <a href="{{ route('clients.show', $declaration->client) }}" class="text-sm text-slate-600 hover:text-slate-900">&larr; Voltar</a>
             </div>
         </div>
 
-        <div class="grid gap-4 md:grid-cols-2">
+        <div class="grid gap-4 md:grid-cols-3">
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                <div class="text-sm text-slate-600">Renda Tributável</div>
+                <div class="text-sm text-slate-600">Rendimentos tributaveis</div>
                 <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($rendaTrib) }}</div>
+                <div class="mt-3 space-y-1 border-t border-slate-100 pt-3 text-sm text-slate-600">
+                    <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                        <span>Recebimentos PJ (Rend PJ - Prev Oficial - IR Fonte + 13o - IR 13o)</span>
+                        <span class="whitespace-nowrap text-right font-medium tabular-nums text-slate-800">{{ $fmt($declaration->rend_trib_pj) }}</span>
+                    </div>
+                    <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+                        <span>Recebimentos PF/Exterior (Rendimentos - Deducoes - Carne-leao)</span>
+                        <span class="whitespace-nowrap text-right font-medium tabular-nums text-slate-800">{{ $fmt($declaration->rend_trib_pf_exterior) }}</span>
+                    </div>
+                </div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                <div class="text-sm text-slate-600">Renda Isenta</div>
+                <div class="text-sm text-slate-600">Renda isenta</div>
                 <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($rendaIsenta) }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                <div class="text-sm text-slate-600">Gastos Estimados</div>
-                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($gastosEstimados) }}</div>
-                @if ($declaration->gastos_estimados === null)
-                    <div class="mt-1 text-xs text-amber-700">Gastos estimados não informados; risco pode estar superestimado.</div>
-                @endif
+                <div class="text-sm text-slate-600">Rend. Trib. Exclusiva/Definitiva</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_rend_exclusiva) }}</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-                <div class="text-sm text-slate-600">Bens adquiridos no ano</div>
-                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($bensAno) }}</div>
+                <div class="text-sm text-slate-600">Rendimentos recebidos acumuladamente</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_rend_recebidos_acumuladamente) }}</div>
+                <div class="mt-1 text-xs text-slate-500">Calculo: Rendimentos - IRRF.</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Renda variavel (operacoes comuns / day trade)</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_renda_variavel) }}</div>
+                <div class="mt-1 text-xs text-slate-500">Jan-Nov: base comum - 15% e base day trade - 20%. Dezembro: somente bases.</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Pagamentos efetuados</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_pagamentos_efetuados) }}</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Doacoes efetuadas</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_doacoes_efetuadas) }}</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Doacoes a partidos politicos</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_doacoes_partidos_politicos) }}</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Atividade rural (resultado tributavel)</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_atividade_rural_resultado_tributavel) }}</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Dividas e onus reais</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_dividas_onus_reais) }}</div>
+                <div class="mt-2 space-y-1 text-xs text-slate-500">
+                    <div>{{ $declaration->ano_base }}: {{ $fmt($declaration->total_dividas_ano_atual) }}</div>
+                    <div>{{ $declaration->ano_base - 1 }}: {{ $fmt($declaration->total_dividas_ano_anterior) }}</div>
+                    <div>Formula: {{ $declaration->ano_base }} - {{ $declaration->ano_base - 1 }}</div>
+                </div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Gastos estimados</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($gastosEstimados) }}</div>
+            </div>
+            <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div class="text-sm text-slate-600">Bens</div>
+                <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_bens_reais) }}</div>
+                <div class="mt-2 space-y-1 text-xs text-slate-500">
+                    <div>{{ $declaration->ano_base }}: {{ $fmt($declaration->total_bens_ano_atual) }}</div>
+                    <div>{{ $declaration->ano_base - 1 }}: {{ $fmt($declaration->total_bens_ano_anterior) }}</div>
+                    <div>Formula: {{ $declaration->ano_base }} - {{ $declaration->ano_base - 1 }}</div>
+                </div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                 <div class="text-sm text-slate-600">Gastos declarados</div>
@@ -74,35 +126,22 @@
 
         <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
             <div class="text-sm font-semibold text-slate-900">Regra aplicada</div>
-            <p class="mt-1 text-sm text-slate-700">Bens Adquiridos &gt; (Renda Tributável + Renda Isenta - (Gastos Estimados + Gastos Declarados))</p>
-            <div class="mt-3 text-sm text-slate-800">
-                <div>Bens Adquiridos: {{ $fmt($bensAno) }}</div>
-                <div>Renda Tributável + Renda Isenta - (Gastos Estimados + Declarados): {{ $fmt($rendaTrib + $rendaIsenta - $gastosTotal) }}</div>
-                <div class="mt-2 font-semibold">Resultado: {{ $fmt($variacao) }}</div>
+            <p class="mt-1 text-sm text-slate-700">Risco quando Caixa &lt; 20% da Evolucao Patrimonial.</p>
+            <div class="mt-3 text-sm text-slate-800 space-y-1">
+                <div>Entradas e Saidas: {{ $fmt($entradasSaidas) }}</div>
+                <div>Evolucao Patrimonial: {{ $fmt($evolucaoPatrimonial) }}</div>
+                <div>Caixa: {{ $fmt($caixaTotal) }}</div>
+                <div>Limite de risco (20%): {{ $fmt($limiteRisco) }}</div>
             </div>
         </div>
 
         <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-            <div class="text-sm font-semibold text-slate-900">Diagnóstico</div>
+            <div class="text-sm font-semibold text-slate-900">Diagnostico</div>
             @if ($risco)
-                <p class="mt-2 text-sm text-red-700">Há indício de variação patrimonial a descoberto.</p>
-                <p class="text-sm text-slate-700">Valor estimado a descoberto: {{ $fmt($variacao) }}</p>
-                <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm text-slate-700">
-                    <li>Revisar bens adquiridos/financiamentos.</li>
-                    <li>Validar rendimentos isentos (doações, heranças, indenizações etc.).</li>
-                    <li>Confirmar rendimentos tributáveis omitidos (PF/PJ/exterior).</li>
-                    <li>Revisar ganhos de capital e atualizações.</li>
-                </ol>
+                <p class="mt-2 text-sm text-red-700">Ha indicio de risco pela regra atual de Caixa.</p>
             @else
-                <p class="mt-2 text-sm text-emerald-700">Sem indício de variação patrimonial a descoberto pela regra aplicada.</p>
+                <p class="mt-2 text-sm text-emerald-700">Sem indicio de risco pela regra atual.</p>
             @endif
-        </div>
-
-        <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
-            <div class="text-sm font-semibold text-slate-900">Aviso de valor</div>
-            <p class="mt-2 text-sm text-slate-700">
-                Aviso de risco vale mais do que só entregar no prazo: pode indicar variação patrimonial a descoberto.
-            </p>
         </div>
 
         @if ($topIsentos->isNotEmpty())
@@ -112,7 +151,7 @@
                     <table class="min-w-full text-left text-sm text-slate-800">
                         <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
                             <tr>
-                                <th class="px-3 py-2">Código</th>
+                                <th class="px-3 py-2">Codigo</th>
                                 <th class="px-3 py-2">Valor</th>
                             </tr>
                         </thead>

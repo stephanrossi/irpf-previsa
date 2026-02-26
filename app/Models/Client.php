@@ -28,6 +28,25 @@ class Client extends Model
 
     public function getHasRiskAttribute(): bool
     {
-        return $this->declarations()->where('risco_variacao_patrimonial', true)->exists();
+        $table = 'declarations';
+        $evolucaoPatrimonial = "COALESCE({$table}.total_bens_reais, 0)";
+        $caixa = '('
+            ."COALESCE({$table}.rend_trib_pj, 0)"
+            ." + COALESCE({$table}.rend_trib_pf_exterior, 0)"
+            ." + COALESCE({$table}.total_renda_isenta, 0)"
+            ." + COALESCE({$table}.total_rend_exclusiva, 0)"
+            ." + COALESCE({$table}.total_rend_recebidos_acumuladamente, 0)"
+            ." + COALESCE({$table}.total_renda_variavel, 0)"
+            ." + COALESCE({$table}.total_atividade_rural_resultado_tributavel, 0)"
+            ." - COALESCE({$table}.total_pagamentos_efetuados, 0)"
+            ." - COALESCE({$table}.total_doacoes_efetuadas, 0)"
+            ." - COALESCE({$table}.total_doacoes_partidos_politicos, 0)"
+            ." - COALESCE({$table}.total_dividas_onus_reais, 0)"
+            ." - COALESCE({$table}.gastos_estimados, 0)"
+            .')';
+
+        return $this->declarations()
+            ->whereRaw("({$evolucaoPatrimonial} > 0 AND {$caixa} < ({$evolucaoPatrimonial} * 0.2))")
+            ->exists();
     }
 }

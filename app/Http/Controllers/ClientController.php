@@ -9,10 +9,13 @@ class ClientController extends Controller
 {
     public function index(Request $request)
     {
+        $riskExpression = $this->riskExpression('declarations');
         $search = trim((string) $request->string('q'));
         $searchDigits = preg_replace('/\D/', '', $search);
         $riskOnly = $request->boolean('risk_only');
         $retificadoraOnly = $request->boolean('retificadora_only');
+        $perPageRequested = (int) $request->integer('per_page', 20);
+        $perPage = in_array($perPageRequested, [20, 50, 100], true) ? $perPageRequested : 20;
         $sort = $request->string('sort', 'nome')->toString();
         $direction = strtolower($request->string('direction', 'asc')->toString()) === 'desc' ? 'desc' : 'asc';
 
@@ -26,7 +29,7 @@ class ClientController extends Controller
 
         $clients = Client::withCount([
                 'declarations',
-                'declarations as risk_declarations_count' => fn ($q) => $q->where('risco_variacao_patrimonial', true),
+                'declarations as risk_declarations_count' => fn ($q) => $q->whereRaw($riskExpression),
             ])
             ->when($search !== '', function ($query) use ($search, $searchDigits) {
                 $query->where(function ($builder) use ($search, $searchDigits) {
@@ -37,14 +40,14 @@ class ClientController extends Controller
                     }
                 });
             })
-            ->when($riskOnly, function ($query) {
-                $query->whereHas('declarations', fn ($q) => $q->where('risco_variacao_patrimonial', true));
+            ->when($riskOnly, function ($query) use ($riskExpression) {
+                $query->whereHas('declarations', fn ($q) => $q->whereRaw($riskExpression));
             })
             ->when($retificadoraOnly, function ($query) {
                 $query->whereHas('declarations', fn ($q) => $q->where('last_is_retificadora', true));
             })
             ->orderBy($orderColumn, $direction)
-            ->paginate(12)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('clients.index', [
@@ -52,9 +55,31 @@ class ClientController extends Controller
             'search' => $search,
             'riskOnly' => $riskOnly,
             'retificadoraOnly' => $retificadoraOnly,
+            'perPage' => $perPage,
             'sort' => $sort,
             'direction' => $direction,
         ]);
+    }
+
+    private function riskExpression(string $table): string
+    {
+        $evolucaoPatrimonial = "COALESCE({$table}.total_bens_reais, 0)";
+        $caixa = '('
+            ."COALESCE({$table}.rend_trib_pj, 0)"
+            ." + COALESCE({$table}.rend_trib_pf_exterior, 0)"
+            ." + COALESCE({$table}.total_renda_isenta, 0)"
+            ." + COALESCE({$table}.total_rend_exclusiva, 0)"
+            ." + COALESCE({$table}.total_rend_recebidos_acumuladamente, 0)"
+            ." + COALESCE({$table}.total_renda_variavel, 0)"
+            ." + COALESCE({$table}.total_atividade_rural_resultado_tributavel, 0)"
+            ." - COALESCE({$table}.total_pagamentos_efetuados, 0)"
+            ." - COALESCE({$table}.total_doacoes_efetuadas, 0)"
+            ." - COALESCE({$table}.total_doacoes_partidos_politicos, 0)"
+            ." - COALESCE({$table}.total_dividas_onus_reais, 0)"
+            ." - COALESCE({$table}.gastos_estimados, 0)"
+            .')';
+
+        return "({$evolucaoPatrimonial} > 0 AND {$caixa} < ({$evolucaoPatrimonial} * 0.2))";
     }
 
     public function show(Client $client)

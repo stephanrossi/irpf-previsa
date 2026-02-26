@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Log cada requisição com IP/host/UA para aparecer no log (e no console se canal stderr estiver ativo).
+        $middleware->append([
+            \App\Http\Middleware\LogClientAccess::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
