@@ -41,6 +41,9 @@ class ParsedDeclarationData
         public readonly float $totalRendaVariavel = 0.0,
         public readonly float $gastosDeclaradosTotal = 0.0,
         public readonly array $gastosDeclaradosBreakdown = [],
+        public readonly int $complexityScore = 0,
+        public readonly string $complexityLevel = 'baixa',
+        public readonly array $complexityBreakdown = [],
         public readonly bool $isRetificadora = false,
         public readonly ?string $reciboAnterior = null,
     ) {

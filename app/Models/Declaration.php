@@ -47,6 +47,9 @@ class Declaration extends Model
         'variacao_patrimonial_descoberto',
         'risco_variacao_patrimonial',
         'inconsistencia_payload',
+        'complexity_score',
+        'complexity_level',
+        'complexity_breakdown',
         'source_file_path',
         'last_is_retificadora',
         'last_recibo_anterior',
@@ -92,6 +95,8 @@ class Declaration extends Model
         'variacao_patrimonial_descoberto' => 'decimal:2',
         'risco_variacao_patrimonial' => 'boolean',
         'inconsistencia_payload' => 'array',
+        'complexity_score' => 'integer',
+        'complexity_breakdown' => 'array',
         'last_is_retificadora' => 'boolean',
         'last_imported_at' => 'datetime',
     ];

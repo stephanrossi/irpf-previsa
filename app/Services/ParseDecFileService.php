@@ -44,6 +44,18 @@ class ParseDecFileService
         $totalIrRraRetido = 0.0;
         $totalIrFonteRendPj = 0.0;
         $totalCarneLeao = 0.0;
+        $fontesPagadorasCount = 0;
+        $dependentesCount = 0;
+        $despesasCount = 0;
+        $bensCount = 0;
+        $dividasCount = 0;
+        $rraCount = 0;
+        $isentosCount = 0;
+        $tributacaoExclusivaCount = 0;
+        $doacoesCount = 0;
+        $hasCarneLeao = false;
+        $hasRendaVariavel = false;
+        $hasAtividadeRural = false;
 
         foreach ($file as $line) {
             if ($line === false || $line === null) {
@@ -99,6 +111,7 @@ class ParseDecFileService
             //   127-139: Imposto Retido na Fonte
             //   148-160: IRRF sobre 13o Salario
             if ($prefix === '21') {
+                $fontesPagadorasCount++;
                 $hasRendimentosBreakdown = true;
                 $rendPj       = $this->parseMoney($this->slice($line, 88, 100));
                 $prevOficial  = $this->parseMoney($this->slice($line, 101, 113));
@@ -129,6 +142,13 @@ class ParseDecFileService
 
                 $rendTribPfExterior += $rendimentosMes - $deducoesMes - $carneLeaoMes;
                 $totalCarneLeao += $carneLeaoMes;
+                if ($carneLeaoMes > 0) {
+                    $hasCarneLeao = true;
+                }
+            }
+
+            if ($prefix === '25') {
+                $dependentesCount++;
             }
 
             if ($prefix === '27') {
@@ -142,6 +162,9 @@ class ParseDecFileService
                 if ($grupoBem === '01') {
                     $bensImoveis += $vrAtual;
                 }
+                if ($vrAtual > 0) {
+                    $bensCount++;
+                }
 
                 $anoData = substr($dtAquisicao, -4);
                 if ($dtAquisicao !== '00000000' && $header && (int) $anoData === $header['ano_base']) {
@@ -154,6 +177,7 @@ class ParseDecFileService
             }
 
             if ($prefix === '28') {
+                $dividasCount++;
                 $situacaoAnoAnterior = $this->parseMoney($this->slice($line, 528, 540));
                 $situacaoAnoAtual = $this->parseMoney($this->slice($line, 541, 553));
                 $detailedDebts += $situacaoAnoAtual;
@@ -165,6 +189,7 @@ class ParseDecFileService
                 $codIsento = (int) $this->parseInt($this->slice($line, 14, 17));
                 $valor = $this->parseMoney($this->slice($line, 18, 30));
                 if ($valor !== 0.0) {
+                    $isentosCount++;
                     $isentos[] = ['codigo' => $codIsento, 'valor' => $valor];
                 }
             }
@@ -172,7 +197,11 @@ class ParseDecFileService
             // Registro 24: Rendimentos sujeitos a tributacao exclusiva/definitiva.
             // Soma dos valores por item.
             if ($prefix === '24') {
-                $totalRendExclusiva += $this->parseMoney($this->slice($line, 18, 30));
+                $valorExclusiva = $this->parseMoney($this->slice($line, 18, 30));
+                $totalRendExclusiva += $valorExclusiva;
+                if ($valorExclusiva !== 0.0) {
+                    $tributacaoExclusivaCount++;
+                }
             }
 
             // Registro 45: Rendimentos Tributaveis de PJ Recebidos Acumuladamente (RRA).
@@ -180,11 +209,17 @@ class ParseDecFileService
             //   90-102: Rendimentos Recebidos
             //   129-141: Imposto Retido na Fonte (RRA)
             if ($prefix === '45') {
+                $rraCount++;
                 $totalRendRecebidosAcumuladamente += $this->parseMoney($this->slice($line, 90, 102));
                 $totalIrRraRetido += $this->parseMoney($this->slice($line, 129, 141));
             }
 
             if ($prefix === '26') {
+                $despesasCount++;
+                $codigoDespesa = $this->slice($line, 14, 15);
+                if (in_array($codigoDespesa, ['80', '81'], true)) {
+                    $doacoesCount++;
+                }
                 $expenses->addPaymentLine($line);
             }
 
@@ -197,6 +232,7 @@ class ParseDecFileService
             //   Jan-Nov: (base comum - 15%) + (base day trade - 20%)
             //   Dez: somente as bases (sem diminuir imposto).
             if ($prefix === '40') {
+                $hasRendaVariavel = true;
                 $mes = $this->parseInt($this->slice($line, 14, 15));
                 $baseOperacoesComuns = max(0.0, $this->parseMoney($this->slice($line, 16, 28)));
                 $baseDayTrade = max(0.0, $this->parseMoney($this->slice($line, 55, 67)));
@@ -208,6 +244,18 @@ class ParseDecFileService
                         $totalRendaVariavel += ($baseOperacoesComuns * 0.85) + ($baseDayTrade * 0.80);
                     }
                 }
+            }
+
+            if ($prefix === '41' || $prefix === '42') {
+                $hasRendaVariavel = true;
+            }
+
+            if ($prefix === '49' && preg_match('/[1-9]/', substr($line, 13))) {
+                $hasCarneLeao = true;
+            }
+
+            if ($prefix === '50' && preg_match('/[1-9]/', substr($line, 13))) {
+                $hasAtividadeRural = true;
             }
         }
 
@@ -233,6 +281,39 @@ class ParseDecFileService
         $totalDividasAnoAtual = $totalDividasAnoAtualReg28 > 0 ? $totalDividasAnoAtualReg28 : $totalDividasOnus;
         $totalDividasOnusReais = $totalDividasAnoAtual - $totalDividasAnoAnterior;
         $bensAdquiridos = $bensAdquiridosAno > 0 ? $bensAdquiridosAno : $bensAdquiridosFallback;
+        if ($totalCarneLeao > 0) {
+            $hasCarneLeao = true;
+        }
+        if ($totalAtividadeRuralResultadoTributavel > 0) {
+            $hasAtividadeRural = true;
+        }
+        $complexityScore = $fontesPagadorasCount
+            + $dependentesCount
+            + $despesasCount
+            + $bensCount
+            + $dividasCount
+            + $rraCount
+            + ($hasCarneLeao ? 1 : 0)
+            + $isentosCount
+            + $tributacaoExclusivaCount
+            + $doacoesCount
+            + ($hasRendaVariavel ? 20 : 0)
+            + ($hasAtividadeRural ? 10 : 0);
+        $complexityLevel = $this->classifyComplexity($complexityScore);
+        $complexityBreakdown = $this->buildComplexityBreakdown(
+            fontesPagadorasCount: $fontesPagadorasCount,
+            dependentesCount: $dependentesCount,
+            despesasCount: $despesasCount,
+            bensCount: $bensCount,
+            dividasCount: $dividasCount,
+            rraCount: $rraCount,
+            hasCarneLeao: $hasCarneLeao,
+            isentosCount: $isentosCount,
+            tributacaoExclusivaCount: $tributacaoExclusivaCount,
+            doacoesCount: $doacoesCount,
+            hasRendaVariavel: $hasRendaVariavel,
+            hasAtividadeRural: $hasAtividadeRural,
+        );
         $expenseTotals = $expenses->result();
 
         return new ParsedDeclarationData(
@@ -272,6 +353,9 @@ class ParseDecFileService
             totalRendaVariavel: $totalRendaVariavel,
             gastosDeclaradosTotal: $expenseTotals['gastos_declarados_total'],
             gastosDeclaradosBreakdown: $expenseTotals['gastos_declarados_breakdown'],
+            complexityScore: $complexityScore,
+            complexityLevel: $complexityLevel,
+            complexityBreakdown: $complexityBreakdown,
             isRetificadora: $header['is_retificadora'],
             reciboAnterior: $header['recibo_anterior'],
         );
@@ -345,5 +429,120 @@ class ParseDecFileService
     private function onlyDigits(string $value): string
     {
         return preg_replace('/\D/', '', $value) ?? '';
+    }
+
+    private function classifyComplexity(int $score): string
+    {
+        if ($score >= 30) {
+            return 'alta';
+        }
+
+        if ($score >= 10) {
+            return 'media';
+        }
+
+        return 'baixa';
+    }
+
+    private function buildComplexityBreakdown(
+        int $fontesPagadorasCount,
+        int $dependentesCount,
+        int $despesasCount,
+        int $bensCount,
+        int $dividasCount,
+        int $rraCount,
+        bool $hasCarneLeao,
+        int $isentosCount,
+        int $tributacaoExclusivaCount,
+        int $doacoesCount,
+        bool $hasRendaVariavel,
+        bool $hasAtividadeRural
+    ): array {
+        return [
+            [
+                'key' => 'fontes_pagadoras',
+                'label' => 'Fontes pagadoras',
+                'points' => $fontesPagadorasCount,
+                'base' => $fontesPagadorasCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'dependentes',
+                'label' => 'Dependentes',
+                'points' => $dependentesCount,
+                'base' => $dependentesCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'despesas',
+                'label' => 'Despesas',
+                'points' => $despesasCount,
+                'base' => $despesasCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'bens_direitos',
+                'label' => 'Bens e direitos (valor > 0)',
+                'points' => $bensCount,
+                'base' => $bensCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'dividas',
+                'label' => 'Dividas',
+                'points' => $dividasCount,
+                'base' => $dividasCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'rra',
+                'label' => 'Rendimentos acumulados (RRA)',
+                'points' => $rraCount,
+                'base' => $rraCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'carne_leao',
+                'label' => 'Carne-leao',
+                'points' => $hasCarneLeao ? 1 : 0,
+                'base' => $hasCarneLeao ? 1 : 0,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'rendimentos_isentos',
+                'label' => 'Rendimentos isentos',
+                'points' => $isentosCount,
+                'base' => $isentosCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'tributacao_exclusiva',
+                'label' => 'Rendimentos de tributacao exclusiva',
+                'points' => $tributacaoExclusivaCount,
+                'base' => $tributacaoExclusivaCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'doacoes_efetuadas',
+                'label' => 'Doacoes efetuadas',
+                'points' => $doacoesCount,
+                'base' => $doacoesCount,
+                'multiplier' => 1,
+            ],
+            [
+                'key' => 'renda_variavel',
+                'label' => 'Renda variavel / acoes / FIIs',
+                'points' => $hasRendaVariavel ? 20 : 0,
+                'base' => $hasRendaVariavel ? 1 : 0,
+                'multiplier' => 20,
+            ],
+            [
+                'key' => 'atividade_rural',
+                'label' => 'Atividade rural',
+                'points' => $hasAtividadeRural ? 10 : 0,
+                'base' => $hasAtividadeRural ? 1 : 0,
+                'multiplier' => 10,
+            ],
+        ];
     }
 }

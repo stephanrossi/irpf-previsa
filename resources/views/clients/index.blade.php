@@ -19,9 +19,23 @@
             <input type="hidden" name="per_page" value="{{ $perPage }}">
             <label class="block text-sm font-medium text-slate-700">Buscar por nome ou CPF</label>
             <div class="mt-2 flex flex-col gap-3 lg:flex-row lg:items-start">
-                <input type="text" name="q" value="{{ $search }}"
-                       class="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                       placeholder="Digite o nome ou CPF">
+                <div class="w-full lg:flex-1">
+                    <div class="flex flex-col gap-2 md:flex-row md:items-center">
+                        <input type="text" name="q" value="{{ $search }}"
+                               class="w-full md:flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                               placeholder="Digite o nome ou CPF">
+                        <div class="flex items-center gap-2 md:w-[260px]">
+                            <label for="complexity" class="text-sm font-medium text-slate-700 whitespace-nowrap">Complexidade:</label>
+                            <select id="complexity" name="complexity"
+                                    class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200">
+                                <option value="">Todas</option>
+                                <option value="baixa" {{ $complexity === 'baixa' ? 'selected' : '' }}>Baixa</option>
+                                <option value="media" {{ $complexity === 'media' ? 'selected' : '' }}>Média</option>
+                                <option value="alta" {{ $complexity === 'alta' ? 'selected' : '' }}>Alta</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex flex-col gap-2 text-sm text-slate-700 lg:min-w-[260px]">
                     <label class="inline-flex items-center gap-2 cursor-pointer">
                         <input type="checkbox" name="risk_only" value="1" {{ $riskOnly ? 'checked' : '' }} class="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300 cursor-pointer">

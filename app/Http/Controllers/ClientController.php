@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Services\ParseDecFileService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Throwable;
 
 class ClientController extends Controller
 {
@@ -12,6 +15,9 @@ class ClientController extends Controller
         $riskExpression = $this->riskExpression('declarations');
         $search = trim((string) $request->string('q'));
         $searchDigits = preg_replace('/\D/', '', $search);
+        $complexityRequested = strtolower(trim((string) $request->string('complexity')));
+        $allowedComplexities = ['baixa', 'media', 'alta'];
+        $complexity = in_array($complexityRequested, $allowedComplexities, true) ? $complexityRequested : '';
         $riskOnly = $request->boolean('risk_only');
         $retificadoraOnly = $request->boolean('retificadora_only');
         $perPageRequested = (int) $request->integer('per_page', 20);
@@ -43,6 +49,9 @@ class ClientController extends Controller
             ->when($riskOnly, function ($query) use ($riskExpression) {
                 $query->whereHas('declarations', fn ($q) => $q->whereRaw($riskExpression));
             })
+            ->when($complexity !== '', function ($query) use ($complexity) {
+                $query->whereHas('declarations', fn ($q) => $q->where('complexity_level', $complexity));
+            })
             ->when($retificadoraOnly, function ($query) {
                 $query->whereHas('declarations', fn ($q) => $q->where('last_is_retificadora', true));
             })
@@ -53,6 +62,7 @@ class ClientController extends Controller
         return view('clients.index', [
             'clients' => $clients,
             'search' => $search,
+            'complexity' => $complexity,
             'riskOnly' => $riskOnly,
             'retificadoraOnly' => $retificadoraOnly,
             'perPage' => $perPage,
@@ -82,13 +92,48 @@ class ClientController extends Controller
         return "({$evolucaoPatrimonial} > 0 AND {$caixa} < ({$evolucaoPatrimonial} * 0.2))";
     }
 
-    public function show(Client $client)
+    public function show(Client $client, ParseDecFileService $parser)
     {
         $client->load(['declarations' => fn ($query) => $query->orderByDesc('ano_base')]);
+        $this->backfillComplexity($client, $parser);
 
         return view('clients.show', [
             'client' => $client,
             'declarations' => $client->declarations,
         ]);
+    }
+
+    private function backfillComplexity(Client $client, ParseDecFileService $parser): void
+    {
+        foreach ($client->declarations as $declaration) {
+            if (
+                $declaration->complexity_level !== null
+                && $declaration->complexity_score !== null
+                && is_array($declaration->complexity_breakdown)
+            ) {
+                continue;
+            }
+
+            $path = (string) $declaration->source_file_path;
+            if ($path === '') {
+                continue;
+            }
+
+            try {
+                $fullPath = Storage::disk('local')->path($path);
+                if (! is_file($fullPath) || ! is_readable($fullPath)) {
+                    continue;
+                }
+
+                $parsed = $parser->parse($fullPath);
+                $declaration->fill([
+                    'complexity_score' => $parsed->complexityScore,
+                    'complexity_level' => $parsed->complexityLevel,
+                    'complexity_breakdown' => $parsed->complexityBreakdown,
+                ])->save();
+            } catch (Throwable) {
+                continue;
+            }
+        }
     }
 }

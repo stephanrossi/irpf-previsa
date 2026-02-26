@@ -113,12 +113,26 @@
                         @php
                             $caixaMetrics = $buildCaixaMetrics($declaration);
                             $totalRendTributaveis = (float) $declaration->rend_trib_pj + (float) $declaration->rend_trib_pf_exterior;
+                            $complexityBreakdown = is_array($declaration->complexity_breakdown) ? $declaration->complexity_breakdown : [];
                         @endphp
-                        <div x-show="tab === '{{ $declaration->ano_base }}'" class="space-y-4" x-cloak>
+                        <div x-data="{ showComplexityModal: false }" x-show="tab === '{{ $declaration->ano_base }}'" class="space-y-4" x-cloak>
                             <div class="flex flex-wrap items-center gap-3 text-sm text-slate-600">
                                 <span class="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-wide text-slate-700">
                                     {{ ucfirst($declaration->tipo) }}
                                 </span>
+                                @php
+                                    $complexityMeta = match ($declaration->complexity_level) {
+                                        'alta' => ['label' => 'Complexidade Alta', 'class' => 'bg-red-50 text-red-700'],
+                                        'media' => ['label' => 'Complexidade Media', 'class' => 'bg-amber-50 text-amber-700'],
+                                        'baixa' => ['label' => 'Complexidade Baixa', 'class' => 'bg-emerald-50 text-emerald-700'],
+                                        default => ['label' => 'Complexidade Nao classificada', 'class' => 'bg-slate-100 text-slate-700'],
+                                    };
+                                @endphp
+                                <button type="button"
+                                        @click="showComplexityModal = true"
+                                        class="inline-flex rounded-full px-3 py-1 text-xs font-semibold {{ $complexityMeta['class'] }} cursor-pointer">
+                                    {{ $complexityMeta['label'] }}
+                                </button>
                                 <span class="text-slate-400">&bull;</span>
                                 <span>Importado em {{ $declaration->imported_at?->format('d/m/Y H:i') }}</span>
                                 @if ($declaration->last_is_retificadora)
@@ -130,6 +144,51 @@
                                         @endif
                                     </span>
                                 @endif
+                            </div>
+                            <div x-show="showComplexityModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" @click.self="showComplexityModal = false" @keydown.escape.window="showComplexityModal = false">
+                                <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+                                    <div class="flex items-center justify-between">
+                                        <h3 class="text-base font-semibold text-slate-900">Classificacao de complexidade</h3>
+                                        <button type="button" @click="showComplexityModal = false" class="cursor-pointer text-sm text-slate-500 hover:text-slate-700">Fechar</button>
+                                    </div>
+                                    <div class="mt-3 space-y-2 text-sm text-slate-700">
+                                        <div>Pontuacao total = soma dos itens de volume (1 ponto por ocorrencia) + itens de alta complexidade.</div>
+                                        <div>Alta complexidade: Renda variavel = +20 pontos; Atividade rural = +10 pontos.</div>
+                                        <div>Faixas: Baixa (0 a 9), Media (10 a 29), Alta (30+).</div>
+                                        <div class="pt-1 font-semibold text-slate-900">
+                                            Resultado desta declaracao: {{ ucfirst($declaration->complexity_level ?? 'nao classificada') }} ({{ (int) ($declaration->complexity_score ?? 0) }} pontos)
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 border-t border-slate-100/70 pt-4">
+                                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Criterios desta declaracao</div>
+                                        @if (empty($complexityBreakdown))
+                                            <div class="text-sm text-slate-600">Detalhamento indisponivel para esta declaracao.</div>
+                                        @else
+                                            <div class="overflow-x-auto">
+                                                <table class="min-w-full text-sm text-slate-800">
+                                                    <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+                                                        <tr>
+                                                            <th class="px-3 py-2 text-left">Criterio</th>
+                                                            <th class="px-3 py-2 text-right">Base</th>
+                                                            <th class="px-3 py-2 text-right">Multiplicador</th>
+                                                            <th class="px-3 py-2 text-right">Pontos</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach ($complexityBreakdown as $criterion)
+                                                            <tr class="border-t border-slate-100">
+                                                                <td class="px-3 py-2">{{ $criterion['label'] ?? '-' }}</td>
+                                                                <td class="px-3 py-2 text-right tabular-nums">{{ (int) ($criterion['base'] ?? 0) }}</td>
+                                                                <td class="px-3 py-2 text-right tabular-nums">x{{ (int) ($criterion['multiplier'] ?? 1) }}</td>
+                                                                <td class="px-3 py-2 text-right font-semibold tabular-nums">{{ (int) ($criterion['points'] ?? 0) }}</td>
+                                                            </tr>
+                                                        @endforeach
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="rounded-xl border border-slate-300 bg-white p-5 shadow-sm" x-data="{ showCaixaFormula: false }" @keydown.escape.window="showCaixaFormula = false">

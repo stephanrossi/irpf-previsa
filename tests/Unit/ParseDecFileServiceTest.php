@@ -462,6 +462,127 @@ class ParseDecFileServiceTest extends TestCase
         $this->assertEqualsWithDelta(1253.0, $data->totalRendTributaveis, 0.001);
     }
 
+    public function test_classifies_complexity_as_baixa_for_low_volume_declaration(): void
+    {
+        $lines = [
+            $this->headerLine(),
+            $this->buildLine('21', [
+                [88, 100, str_pad('100000', 13, '0', STR_PAD_LEFT)],
+                [101, 113, str_pad('10000', 13, '0', STR_PAD_LEFT)],
+                [114, 126, str_pad('12000', 13, '0', STR_PAD_LEFT)],
+                [127, 139, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+                [148, 160, str_pad('2000', 13, '0', STR_PAD_LEFT)],
+            ]),
+        ];
+
+        $data = $this->service->parse($this->writeTempDec($lines));
+
+        $this->assertSame(1, $data->complexityScore);
+        $this->assertSame('baixa', $data->complexityLevel);
+        $this->assertNotEmpty($data->complexityBreakdown);
+    }
+
+    public function test_calculates_complexity_score_and_classifies_as_alta(): void
+    {
+        $lines = [
+            $this->headerLine(anoBase: 2024),
+            $this->buildLine('21', [
+                [88, 100, str_pad('100000', 13, '0', STR_PAD_LEFT)],
+                [101, 113, str_pad('10000', 13, '0', STR_PAD_LEFT)],
+                [114, 126, str_pad('12000', 13, '0', STR_PAD_LEFT)],
+                [127, 139, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+                [148, 160, str_pad('2000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('21', [
+                [88, 100, str_pad('50000', 13, '0', STR_PAD_LEFT)],
+                [101, 113, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+                [114, 126, str_pad('6000', 13, '0', STR_PAD_LEFT)],
+                [127, 139, str_pad('2500', 13, '0', STR_PAD_LEFT)],
+                [148, 160, str_pad('1000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('25', [
+                [14, 24, 'DEPENDENTE1'],
+            ]),
+            $this->buildLine('26', [
+                [14, 15, '26'],
+                [106, 118, str_pad('10000', 13, '0', STR_PAD_LEFT)],
+                [119, 131, str_pad('0', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('26', [
+                [14, 15, '80'],
+                [106, 118, str_pad('20000', 13, '0', STR_PAD_LEFT)],
+                [119, 131, str_pad('0', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('27', [
+                [532, 544, str_pad('0', 13, '0', STR_PAD_LEFT)],
+                [545, 557, str_pad('1000', 13, '0', STR_PAD_LEFT)],
+                [1101, 1102, '01'],
+            ]),
+            $this->buildLine('27', [
+                [532, 544, str_pad('0', 13, '0', STR_PAD_LEFT)],
+                [545, 557, str_pad('0', 13, '0', STR_PAD_LEFT)],
+                [1101, 1102, '02'],
+            ]),
+            $this->buildLine('28', [
+                [528, 540, str_pad('1000', 13, '0', STR_PAD_LEFT)],
+                [541, 553, str_pad('2000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('45', [
+                [90, 102, str_pad('1000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('49', [
+                [14, 26, str_pad('100', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('23', [
+                [14, 17, '1501'],
+                [18, 30, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('24', [
+                [14, 17, '0006'],
+                [18, 30, str_pad('2500', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('40', [
+                [14, 15, '01'],
+                [16, 28, str_pad('10000', 13, '0', STR_PAD_LEFT)],
+                [55, 67, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+            ]),
+            $this->buildLine('50', [
+                [14, 26, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+            ]),
+        ];
+
+        $data = $this->service->parse($this->writeTempDec($lines));
+
+        $this->assertSame(42, $data->complexityScore);
+        $this->assertSame('alta', $data->complexityLevel);
+        $byKey = collect($data->complexityBreakdown)->keyBy('key');
+        $this->assertSame(2, $byKey['fontes_pagadoras']['points']);
+        $this->assertSame(20, $byKey['renda_variavel']['points']);
+        $this->assertSame(10, $byKey['atividade_rural']['points']);
+    }
+
+    public function test_classifies_complexity_as_media_on_threshold(): void
+    {
+        $lines = [
+            $this->headerLine(),
+            $this->buildLine('21', [[88, 100, str_pad('1000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('21', [[88, 100, str_pad('2000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('25', [[14, 24, 'DEP1']]),
+            $this->buildLine('25', [[14, 24, 'DEP2']]),
+            $this->buildLine('26', [[14, 15, '26'], [106, 118, str_pad('1000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('26', [[14, 15, '10'], [106, 118, str_pad('2000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('27', [[545, 557, str_pad('1000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('28', [[541, 553, str_pad('1000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('45', [[90, 102, str_pad('1000', 13, '0', STR_PAD_LEFT)]]),
+            $this->buildLine('23', [[14, 17, '1501'], [18, 30, str_pad('500', 13, '0', STR_PAD_LEFT)]]),
+        ];
+
+        $data = $this->service->parse($this->writeTempDec($lines));
+
+        $this->assertSame(10, $data->complexityScore);
+        $this->assertSame('media', $data->complexityLevel);
+    }
+
     private function headerLine(
         int $exercicio = 2024,
         int $anoBase = 2023,
