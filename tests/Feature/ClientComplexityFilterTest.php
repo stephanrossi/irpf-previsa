@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Declaration;
+use Illuminate\Support\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -75,9 +76,50 @@ class ClientComplexityFilterTest extends TestCase
         $ano2022->assertSee('Cliente C');
     }
 
-    private function createDeclaration(int $clientId, int $anoBase, string $complexity): void
+    public function test_risk_status_and_filter_consider_only_latest_imported_declaration(): void
     {
-        Declaration::create([
+        $clienteA = Client::create(['nome' => 'Cliente A', 'cpf' => '11111111111']);
+        $clienteB = Client::create(['nome' => 'Cliente B', 'cpf' => '22222222222']);
+
+        // Cliente A: antiga em risco, ultima importada sem risco => status OK.
+        $this->createDeclaration($clienteA->id, 2022, 'alta', [
+            'imported_at' => Carbon::parse('2026-02-20 10:00:00'),
+            'total_bens_reais' => 100,
+            'rend_trib_pj' => 0,
+        ]);
+        $this->createDeclaration($clienteA->id, 2024, 'media', [
+            'imported_at' => Carbon::parse('2026-02-25 10:00:00'),
+            'total_bens_reais' => 100,
+            'rend_trib_pj' => 100,
+        ]);
+
+        // Cliente B: ultima importada em risco => status Em risco.
+        $this->createDeclaration($clienteB->id, 2023, 'baixa', [
+            'imported_at' => Carbon::parse('2026-02-21 10:00:00'),
+            'total_bens_reais' => 100,
+            'rend_trib_pj' => 100,
+        ]);
+        $this->createDeclaration($clienteB->id, 2024, 'alta', [
+            'imported_at' => Carbon::parse('2026-02-26 10:00:00'),
+            'total_bens_reais' => 100,
+            'rend_trib_pj' => 0,
+        ]);
+
+        $response = $this->get(route('clients.index'));
+        $response->assertOk();
+        $html = $response->getContent();
+        $this->assertMatchesRegularExpression('/Cliente A.*?OK/s', $html);
+        $this->assertMatchesRegularExpression('/Cliente B.*?Em risco/s', $html);
+
+        $riskOnly = $this->get(route('clients.index', ['risk_only' => 1]));
+        $riskOnly->assertOk();
+        $riskOnly->assertSee('Cliente B');
+        $riskOnly->assertDontSee('Cliente A');
+    }
+
+    private function createDeclaration(int $clientId, int $anoBase, string $complexity, array $overrides = []): void
+    {
+        $base = [
             'client_id' => $clientId,
             'exercicio' => $anoBase + 1,
             'ano_base' => $anoBase,
@@ -95,6 +137,8 @@ class ClientComplexityFilterTest extends TestCase
             },
             'complexity_level' => $complexity,
             'complexity_breakdown' => [],
-        ]);
+        ];
+
+        Declaration::create(array_merge($base, $overrides));
     }
 }

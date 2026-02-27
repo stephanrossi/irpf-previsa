@@ -223,25 +223,32 @@ class ParseDecFileService
                 $expenses->addPaymentLine($line);
             }
 
-            // Registro 40: Renda Variavel - Operacoes Comuns / Day Trade (mes a mes).
-            // Campos usados:
+            // Registro 40: Renda Variavel - Resultados (Operacoes Comuns / Day Trade).
+            // Campos usados (leiaute DIRPF):
             //   14-15: mes (01-12)
-            //   16-28: Base de calculo do imposto - Operacoes Comuns
-            //   55-67: Base de calculo do imposto - Day Trade
-            // Regra solicitada:
-            //   Jan-Nov: (base comum - 15%) + (base day trade - 20%)
-            //   Dez: somente as bases (sem diminuir imposto).
+            //   94-106: Base de Calculo do Imposto - Operacoes Comuns
+            //   107-119: Base de Calculo do Imposto - Day Trade
+            //   120-124: Aliquota do Imposto - Operacoes Comuns
+            //   125-129: Aliquota do Imposto - Day Trade
+            // Regra:
+            //   Jan-Nov: valor liquido = base * (1 - aliquota/100), por coluna.
+            //   Dez: considera somente as bases (sem reduzir aliquota).
+            //   Quando a aliquota vier zerada/ausente no arquivo, usar padrao 15% (comuns) e 20% (day trade).
             if ($prefix === '40') {
                 $hasRendaVariavel = true;
                 $mes = $this->parseInt($this->slice($line, 14, 15));
-                $baseOperacoesComuns = max(0.0, $this->parseMoney($this->slice($line, 16, 28)));
-                $baseDayTrade = max(0.0, $this->parseMoney($this->slice($line, 55, 67)));
+                $baseOperacoesComuns = max(0.0, $this->parseMoney($this->slice($line, 94, 106)));
+                $baseDayTrade = max(0.0, $this->parseMoney($this->slice($line, 107, 119)));
+                $aliquotaOperacoesComuns = $this->parseAliquotaPercent($this->slice($line, 120, 124), 15.0);
+                $aliquotaDayTrade = $this->parseAliquotaPercent($this->slice($line, 125, 129), 20.0);
 
                 if ($mes >= 1 && $mes <= 12) {
                     if ($mes === 12) {
                         $totalRendaVariavel += $baseOperacoesComuns + $baseDayTrade;
                     } else {
-                        $totalRendaVariavel += ($baseOperacoesComuns * 0.85) + ($baseDayTrade * 0.80);
+                        $fatorComuns = max(0.0, 1 - ($aliquotaOperacoesComuns / 100));
+                        $fatorDayTrade = max(0.0, 1 - ($aliquotaDayTrade / 100));
+                        $totalRendaVariavel += ($baseOperacoesComuns * $fatorComuns) + ($baseDayTrade * $fatorDayTrade);
                     }
                 }
             }
@@ -424,6 +431,43 @@ class ParseDecFileService
         $digits = preg_replace('/\D/', '', $value) ?? '';
 
         return (int) $digits;
+    }
+
+    private function parseAliquotaPercent(string $value, float $default): float
+    {
+        $clean = trim($value);
+        if ($clean === '') {
+            return $default;
+        }
+
+        // Aceita formatos com pontuacao (ex.: 15,00 / 15.00) e formato numerico compacto (ex.: 01500).
+        $normalized = str_replace(',', '.', preg_replace('/[^0-9,.\-]/', '', $clean) ?? '');
+        if ($normalized !== '' && is_numeric($normalized)) {
+            $aliquota = (float) $normalized;
+            if ($aliquota > 100) {
+                $aliquota /= 100;
+            }
+
+            if ($aliquota > 0) {
+                return min(100.0, $aliquota);
+            }
+        }
+
+        $digits = preg_replace('/\D/', '', $clean);
+        if ($digits === null || $digits === '') {
+            return $default;
+        }
+
+        $aliquota = (float) $digits;
+        if ($aliquota > 100) {
+            $aliquota /= 100;
+        }
+
+        if ($aliquota <= 0) {
+            return $default;
+        }
+
+        return min(100.0, $aliquota);
     }
 
     private function onlyDigits(string $value): string

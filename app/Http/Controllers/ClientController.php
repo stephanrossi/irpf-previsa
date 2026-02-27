@@ -14,6 +14,7 @@ class ClientController extends Controller
     public function index(Request $request)
     {
         $riskExpression = $this->riskExpression('declarations');
+        $latestDeclarationExpression = $this->latestDeclarationExpression('declarations');
         $search = trim((string) $request->string('q'));
         $searchDigits = preg_replace('/\D/', '', $search);
         $complexityRequested = strtolower(trim((string) $request->string('complexity')));
@@ -39,13 +40,15 @@ class ClientController extends Controller
             'nome' => 'nome',
             'cpf' => 'cpf',
             'anos' => 'declarations_count',
-            'status' => 'risk_declarations_count',
+            'status' => 'latest_risk_declarations_count',
         ];
         $orderColumn = $allowedSorts[$sort] ?? 'nome';
 
         $clients = Client::withCount([
                 'declarations',
-                'declarations as risk_declarations_count' => fn ($q) => $q->whereRaw($riskExpression),
+                'declarations as latest_risk_declarations_count' => fn ($q) => $q
+                    ->whereRaw($latestDeclarationExpression)
+                    ->whereRaw($riskExpression),
             ])
             ->when($search !== '', function ($query) use ($search, $searchDigits) {
                 $query->where(function ($builder) use ($search, $searchDigits) {
@@ -56,8 +59,10 @@ class ClientController extends Controller
                     }
                 });
             })
-            ->when($riskOnly, function ($query) use ($riskExpression) {
-                $query->whereHas('declarations', fn ($q) => $q->whereRaw($riskExpression));
+            ->when($riskOnly, function ($query) use ($riskExpression, $latestDeclarationExpression) {
+                $query->whereHas('declarations', fn ($q) => $q
+                    ->whereRaw($latestDeclarationExpression)
+                    ->whereRaw($riskExpression));
             })
             ->when($complexity !== '', function ($query) use ($complexity) {
                 $query->whereHas('declarations', fn ($q) => $q->where('complexity_level', $complexity));
@@ -105,6 +110,16 @@ class ClientController extends Controller
             .')';
 
         return "({$evolucaoPatrimonial} > 0 AND {$caixa} < ({$evolucaoPatrimonial} * 0.2))";
+    }
+
+    private function latestDeclarationExpression(string $table): string
+    {
+        return "{$table}.id = ("
+            ."SELECT d2.id FROM declarations d2 "
+            ."WHERE d2.client_id = {$table}.client_id "
+            ."ORDER BY COALESCE(d2.imported_at, d2.created_at) DESC, d2.id DESC "
+            ."LIMIT 1"
+            .")";
     }
 
     public function show(Client $client, ParseDecFileService $parser)

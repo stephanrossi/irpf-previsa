@@ -282,24 +282,30 @@ class ParseDecFileServiceTest extends TestCase
         $this->assertEqualsWithDelta(95163.30, $data->totalImpostoPagoRetido, 0.001);
     }
 
-    public function test_calculates_renda_variavel_with_december_special_rule(): void
+    public function test_calculates_renda_variavel_from_base_calculo_and_aliquota(): void
     {
         $lines = [
             $this->headerLine(),
             $this->buildLine('40', [
                 [14, 15, '01'],
-                [16, 28, str_pad('10000', 13, '0', STR_PAD_LEFT)], // base comum 100.00
-                [55, 67, str_pad('5000', 13, '0', STR_PAD_LEFT)], // base day trade 50.00
+                [94, 106, str_pad('10000', 13, '0', STR_PAD_LEFT)], // base comum 100.00
+                [107, 119, str_pad('5000', 13, '0', STR_PAD_LEFT)], // base day trade 50.00
+                [120, 124, '01500'], // 15.00%
+                [125, 129, '02000'], // 20.00%
             ]),
             $this->buildLine('40', [
                 [14, 15, '02'],
-                [16, 28, '-'.str_pad('10000', 12, '0', STR_PAD_LEFT)], // negativa -> deve zerar
-                [55, 67, str_pad('2000', 13, '0', STR_PAD_LEFT)], // base day trade 20.00
+                [94, 106, '-'.str_pad('10000', 12, '0', STR_PAD_LEFT)], // negativa -> deve zerar
+                [107, 119, str_pad('2000', 13, '0', STR_PAD_LEFT)], // base day trade 20.00
+                [120, 124, '01500'], // 15.00%
+                [125, 129, '02000'], // 20.00%
             ]),
             $this->buildLine('40', [
                 [14, 15, '12'],
-                [16, 28, str_pad('30000', 13, '0', STR_PAD_LEFT)], // base comum 300.00
-                [55, 67, str_pad('7000', 13, '0', STR_PAD_LEFT)], // base day trade 70.00
+                [94, 106, str_pad('30000', 13, '0', STR_PAD_LEFT)], // base comum 300.00
+                [107, 119, str_pad('7000', 13, '0', STR_PAD_LEFT)], // base day trade 70.00
+                [120, 124, '01500'], // 15.00%
+                [125, 129, '02000'], // 20.00%
             ]),
         ];
 
@@ -307,8 +313,26 @@ class ParseDecFileServiceTest extends TestCase
 
         // Jan: 100*0.85 + 50*0.80 = 125.00
         // Fev: 0*0.85 + 20*0.80 = 16.00 (base comum negativa desconsiderada)
-        // Dez: 300 + 70 = 370.00 (sem desconto do imposto)
+        // Dez: 300 + 70 = 370.00 (particularidade de dezembro)
         $this->assertEqualsWithDelta(511.00, $data->totalRendaVariavel, 0.001);
+    }
+
+    public function test_uses_default_aliquotas_when_reg40_aliquota_fields_are_zero(): void
+    {
+        $lines = [
+            $this->headerLine(),
+            $this->buildLine('40', [
+                [14, 15, '03'],
+                [94, 106, str_pad('10000', 13, '0', STR_PAD_LEFT)], // base comum 100.00
+                [107, 119, str_pad('5000', 13, '0', STR_PAD_LEFT)], // base day trade 50.00
+                [120, 124, '00000'], // fallback 15%
+                [125, 129, '00000'], // fallback 20%
+            ]),
+        ];
+
+        $data = $this->service->parse($this->writeTempDec($lines));
+
+        $this->assertEqualsWithDelta(125.00, $data->totalRendaVariavel, 0.001);
     }
 
     public function test_sums_total_pagamentos_efetuados_from_reg_26(): void
@@ -543,8 +567,10 @@ class ParseDecFileServiceTest extends TestCase
             ]),
             $this->buildLine('40', [
                 [14, 15, '01'],
-                [16, 28, str_pad('10000', 13, '0', STR_PAD_LEFT)],
-                [55, 67, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+                [94, 106, str_pad('10000', 13, '0', STR_PAD_LEFT)],
+                [107, 119, str_pad('5000', 13, '0', STR_PAD_LEFT)],
+                [120, 124, '01500'],
+                [125, 129, '02000'],
             ]),
             $this->buildLine('50', [
                 [14, 26, str_pad('5000', 13, '0', STR_PAD_LEFT)],

@@ -78,7 +78,7 @@
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                 <div class="text-sm text-slate-600">Renda variavel (operacoes comuns / day trade)</div>
                 <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $fmt($declaration->total_renda_variavel) }}</div>
-                <div class="mt-1 text-xs text-slate-500">Jan-Nov: base comum - 15% e base day trade - 20%. Dezembro: somente bases.</div>
+                <div class="mt-1 text-xs text-slate-500">Calculo pela base de calculo do imposto. Jan-Nov aplica aliquotas vigentes por coluna; dezembro considera somente as bases.</div>
             </div>
             <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                 <div class="text-sm text-slate-600">Pagamentos efetuados</div>

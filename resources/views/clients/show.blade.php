@@ -146,7 +146,7 @@
                                 @endif
                             </div>
                             <div x-show="showComplexityModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" @click.self="showComplexityModal = false" @keydown.escape.window="showComplexityModal = false">
-                                <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+                                <div class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                                     <div class="flex items-center justify-between">
                                         <h3 class="text-base font-semibold text-slate-900">Classifica&ccedil;&atilde;o de complexidade</h3>
                                         <button type="button" @click="showComplexityModal = false" class="cursor-pointer text-sm text-slate-500 hover:text-slate-700">Fechar</button>
@@ -215,7 +215,7 @@
                                     <div>Evolu&ccedil;&atilde;o Patrimonial: {{ $formatMoney($caixaMetrics['evolucao_patrimonial']) }}</div>
                                 </div>
                                 <div x-show="showCaixaFormula" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4" @click.self="showCaixaFormula = false">
-                                    <div class="w-full max-w-2xl rounded-xl bg-white p-5 shadow-xl">
+                                    <div class="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
                                         <div class="flex items-center justify-between">
                                             <h3 class="text-base font-semibold text-slate-900">C&aacute;lculo do Caixa</h3>
                                             <button type="button" @click="showCaixaFormula = false" class="cursor-pointer text-sm text-slate-500 hover:text-slate-700">Fechar</button>
@@ -258,7 +258,7 @@
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                                     <div class="text-sm text-slate-600">Renda vari&aacute;vel (opera&ccedil;&otilde;es comuns / day trade)</div>
                                     <div class="mt-2 text-2xl font-semibold text-slate-900">{{ $formatMoney($declaration->total_renda_variavel) }}</div>
-                                    <div class="mt-1 text-xs text-slate-500">Jan-Nov: base comum - 15% e base day trade - 20%. Dezembro: somente bases.</div>
+                                    <div class="mt-1 text-xs text-slate-500">C&aacute;lculo pela base de c&aacute;lculo do imposto. Jan-Nov aplica al&iacute;quotas vigentes por coluna; dezembro considera somente as bases.</div>
                                 </div>
                                 <div class="rounded-xl border border-slate-200 bg-white/80 p-4 shadow-sm">
                                     <div class="text-sm text-slate-600">Pagamentos efetuados</div>
